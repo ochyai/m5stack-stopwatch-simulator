@@ -82,3 +82,64 @@ jobs:
 
       - name: Compile production SOKKON and run simulator tests
         run: make simulator-test
+
+  workbench:
+    name: Test Firmware Workbench
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: simulator/workbench/package-lock.json
+
+      - name: Install Workbench dependencies
+        run: npm ci --prefix simulator/workbench
+
+      - name: Build Workbench
+        run: npm --prefix simulator/workbench run build
+
+      - name: Test Workbench transports and Sites package
+        run: npm --prefix simulator/workbench run test:sites
+
+  macos-simulator:
+    name: Build native macOS simulator
+    runs-on: macos-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: simulator/workbench/package-lock.json
+
+      - name: Install Workbench dependencies
+        run: npm ci --prefix simulator/workbench
+
+      - name: Build ad-hoc signed local app
+        run: ./macos/M5StackSimulator/scripts/build-app.sh --skip-dependency-install --adhoc-sign
+
+      - name: Verify app signature and bundle
+        run: codesign --verify --deep --strict --verbose=2 "macos/M5StackSimulator/dist/M5Stack Simulator.app"
+
+      - name: Build local DMG and checksum
+        run: ./macos/M5StackSimulator/scripts/build-dmg.sh
+
+      - name: Upload local simulator package
+        uses: actions/upload-artifact@v4
+        with:
+          name: m5stack-simulator-local-${{ runner.arch }}
+          path: |
+            macos/M5StackSimulator/dist/*.dmg
+            macos/M5StackSimulator/dist/*.sha256

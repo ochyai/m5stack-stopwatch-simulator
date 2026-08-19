@@ -9,7 +9,7 @@ import subprocess
 import time
 import unittest
 
-from simulator.backend import NativeSimulatorBackend
+from simulator.backend import NativeSimulatorBackend, NativeSimulatorBackendManager
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -220,6 +220,15 @@ class ProductionStopwatchRunnerTest(unittest.TestCase):
       with NativeSimulatorBackend(firmware_id=firmware_id) as backend:
         observed.append(backend.snapshot()["firmware"]["id"])
     self.assertEqual(observed, ["10_sokkon", "99_stopwatch", "10_sokkon"])
+
+  def test_manager_switches_between_both_managed_production_binaries(self) -> None:
+    with NativeSimulatorBackendManager() as manager:
+      observed = [manager.snapshot()["firmware"]["id"]]
+      observed.append(manager.switch_firmware("99_stopwatch")["firmware"]["id"])
+      observed.append(manager.switch_firmware("10_sokkon")["firmware"]["id"])
+      catalog = manager.firmwares()
+    self.assertEqual(observed, ["10_sokkon", "99_stopwatch", "10_sokkon"])
+    self.assertEqual(catalog["active"], "10_sokkon")
 
   def test_build_registry_rejects_paths_before_invoking_a_compiler(self) -> None:
     environment = dict(os.environ)

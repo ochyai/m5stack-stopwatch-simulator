@@ -16,10 +16,36 @@ make simulator FIRMWARE=99_stopwatch
 
 # ブラウザを自動で開かず起動
 make simulator-serve
+
+# Xcode Simulator風のFirmware Workbench
+make workbench-install
+make workbench FIRMWARE=99_stopwatch
+
+# 自己完結するmacOSアプリとローカルDMG
+make macos-app
+make macos-dmg
 ```
 
-既定URLは `http://127.0.0.1:8765/` です。外部サービス、CDN、クラウド、実機は使いません。
-Apple ClangまたはGCC系のC++ compilerとPython 3だけで動作し、追加のPython packageも不要です。
+従来のHTTP simulatorの既定URLは `http://127.0.0.1:8765/` です。外部サービス、CDN、クラウド、
+実機は使いません。このHTTP simulator単体はApple ClangまたはGCC系のC++ compilerとPython 3だけで
+動作し、追加のPython packageも不要です。
+
+Firmware Workbenchの準備とbuildにはNode.js 22 / npmが必要です。自己完結する`.app` / DMGの作成は
+macOS上でSwift toolchainとAppleの`plutil`、`sips`、`iconutil`、`codesign`、`hdiutil`を使います。
+公開配布時はこれらに加えてDeveloper ID証明書とnotarization用の認証情報が必要です。
+
+## Firmware WorkbenchとmacOSアプリ
+
+`simulator/workbench/`は、firmware一覧、Build & Run、実機比率のC152、Inputs / Display / System
+Inspector、Event Timelineを1つのdesktop UIへまとめます。`make workbench`ではViteが`4173`、Python bridgeが
+`8765`で動き、画面上から`10_sokkon`と`99_stopwatch`を安全に切り替えられます。新しいrunnerが起動し、
+firmware IDと最初のsnapshotを検証できるまで現在のrunnerを停止しません。
+
+`macos/M5StackSimulator/`は同じWorkbenchをSwiftUI + WKWebViewへ内包します。HTTPやPythonを起動せず、
+allowlistされたPromise APIからSwiftのProcess bridgeへ接続し、bundle内の2本のnative runnerだけを実行します。
+macOSのtraffic-light controlsを使うためHTML側に偽のtitle barは置きません。詳しいbridge contract、child process
+lifecycle、resource traversal防止、local app / DMG、Developer ID配布準備は
+[M5Stack Simulator for macOS](../macos/M5StackSimulator/README.md)を参照してください。
 
 ## 対応ファームウェア
 
@@ -116,12 +142,24 @@ haptic、draw commandを同じrevisionで観測できます。
 ```bash
 curl http://127.0.0.1:8765/healthz
 curl http://127.0.0.1:8765/api/state
+curl http://127.0.0.1:8765/api/firmwares
+curl -H 'Content-Type: application/json' \
+  -d '{"firmware":"99_stopwatch"}' \
+  http://127.0.0.1:8765/api/firmware
 curl -H 'Content-Type: application/json' \
   -d '{"action":"mark"}' http://127.0.0.1:8765/api/action
 curl -H 'Content-Type: application/json' \
   -d '{"connected":true,"outcome":"ERROR","latency_ms":400}' \
   http://127.0.0.1:8765/api/scenario
 ```
+
+`GET /api/firmwares`は固定レジストリの`id` / `label`一覧と現在の`active` IDを返します。
+`POST /api/firmware`は本文が`{"firmware":"10_sokkon"}`または
+`{"firmware":"99_stopwatch"}`の完全一致だけを受け付け、新しいnative processの起動、firmware ID検証、
+最初のsnapshot取得がすべて成功してから切り替えます。失敗時は現在のprocessを維持し、成功時は旧processを
+終了します。同じIDを再選択した場合も、編集された本番sourceを再ビルドできるよう新しいcandidateを検証して
+入れ替えます。state、action、scenario、切り替えは同じlockで直列化され、入力値からpathやcompiler optionを
+組み立てません。
 
 server CLIは`--firmware`、`--host`、`--port`、`--open` / `--no-open`を受け取ります。loopback以外へbindするときは
 `--allow-remote`も必要です。このserverに認証やTLSはないため、信頼できないnetworkへ公開しません。

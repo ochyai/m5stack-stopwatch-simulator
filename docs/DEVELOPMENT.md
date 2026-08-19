@@ -129,6 +129,14 @@ make simulator-serve ARGS="--port 9000"
 
 # production C++、native process、HTTP/static UIをまとめて検証
 make simulator-test
+
+# desktop Workbenchを起動（初回だけworkbench-install）
+make workbench-install
+make workbench FIRMWARE=99_stopwatch
+
+# Swift bridge、Workbench、両runnerを自己完結app / DMGへpackage
+make macos-app
+make macos-dmg
 ```
 
 生成した実行ファイルは`.simulator/`へ置かれ、Gitには含めません。GitHub ActionsもUbuntuのhost compilerで同じ本番ソースをビルドして`test_simulator/`を実行します。
@@ -136,6 +144,10 @@ make simulator-test
 PlatformIOの`native`環境とcompiler-driven simulatorは役割が異なります。`make test`は抽出した純粋ロジックを高速に単体検証し、`make simulator-test`は本番`setup()` / `loop()`、描画、protocol parserまで統合して検証します。
 
 画面やprotocolを変更するときは、ロジックをPythonやJavaScriptへ複製せず、本番C++を変更します。新しく使うArduino/M5Unified APIがあればHALへ観測可能な効果を追加し、`make simulator-test`を通してから実機で物理特性を確認します。詳しい構造、仮想時間、保証境界は [SIMULATOR.md](SIMULATOR.md) を参照してください。
+
+Workbenchの変更は`npm --prefix simulator/workbench run build`と`npm --prefix simulator/workbench run test:sites`、
+native shellの変更は`swift test --disable-sandbox --package-path macos/M5StackSimulator`でも確認します。`make macos-app`
+はlocal launch用のad-hoc署名を行いますが、Developer ID署名やnotarizationの代替にはなりません。
 
 ## Mac companion
 

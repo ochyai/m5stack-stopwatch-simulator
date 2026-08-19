@@ -65,9 +65,21 @@ make simulator-serve ARGS="--port 9000"
 
 # native runner、process bridge、HTTP/static UIの回帰テスト
 make simulator-test
+
+# 初回だけ: 3ペインのFirmware Workbenchを準備
+make workbench-install
+
+# ファーム切替、Inspector、イベントTimeline付きWorkbenchを起動
+make workbench FIRMWARE=99_stopwatch
+
+# Pythonやlocalhost serverを使わないmacOSアプリとローカルDMGを生成
+make macos-app
+make macos-dmg
 ```
 
-既定URLは`http://127.0.0.1:8765/`です。`FIRMWARE=10_sokkon`と`FIRMWARE=99_stopwatch`は固定レジストリからだけ選べ、選択値からファイルパスやコンパイラ引数を組み立てません。外部サービスや実機は不要です。仕組み、操作、保証範囲は [Mac Simulator](docs/SIMULATOR.md) を参照してください。
+Workbenchの既定URLは`http://127.0.0.1:4173/`、従来UI/APIは`http://127.0.0.1:8765/`です。`FIRMWARE=10_sokkon`と`FIRMWARE=99_stopwatch`は固定レジストリからだけ選べ、選択値からファイルパスやコンパイラ引数を組み立てません。外部サービスや実機は不要です。
+
+`M5Stack Simulator.app`はWorkbench、Swiftの型付きbridge、両方のnative runnerを自己完結で内包します。生成物は`macos/M5StackSimulator/dist/`です。現在のDMGはこのMac向けのad-hoc署名版で、一般公開にはリポジトリlicenseの決定、Developer ID署名、notarizationが別途必要です。仕組みと操作は [Mac Simulator](docs/SIMULATOR.md)、アプリの信頼境界と配布手順は [macOS app](macos/M5StackSimulator/README.md) を参照してください。
 
 ## できること
 
@@ -143,7 +155,8 @@ pio device monitor -e 00_smoke --port /dev/cu.usbmodemXXXX
 firmware/apps/       機能別ファームウェア
 firmware/shared/     共通のボード初期化とロジック
 companion/           追加依存なしの macOS USB companion
-simulator/           本番C++を動かすnative HAL、process bridge、browser UI
+simulator/           本番C++を動かすnative HAL、process bridge、browser UI、Workbench
+macos/               自己完結型M5Stack Simulator.appとDMGのbuild定義
 scripts/             ビルド、ポート検出、バックアップ、書き込み
 test/                PC 上で動かす単体テスト
 test_companion/      companion の単体・PTY統合テスト

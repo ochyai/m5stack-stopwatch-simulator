@@ -7,7 +7,7 @@ NDJSON snapshot for each command.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 import json
 import math
@@ -15,6 +15,7 @@ import os
 from pathlib import Path
 import selectors
 import shlex
+import signal
 import subprocess
 import threading
 import time
@@ -116,6 +117,18 @@ def firmware_spec(firmware_id: object) -> FirmwareSpec:
   except KeyError as error:
     expected = ", ".join(SUPPORTED_FIRMWARE_IDS)
     raise BackendInputError(f"unsupported firmware; expected one of: {expected}") from error
+
+
+def firmware_catalog(active_firmware_id: object) -> dict[str, Any]:
+  """Return public metadata for the fixed simulator firmware registry."""
+  active = firmware_spec(active_firmware_id)
+  return {
+    "active": active.firmware_id,
+    "firmwares": [
+      {"id": spec.firmware_id, "label": spec.label}
+      for spec in FIRMWARE_SPECS.values()
+    ],
+  }
 
 
 def normalize_action(action: object) -> str:
@@ -243,6 +256,41 @@ def binary_is_stale(binary: Path, sources: Iterable[Path]) -> bool:
   return False
 
 
+def _terminate_build_process_group(process: subprocess.Popen[bytes]) -> None:
+  """Boundedly terminate a build and every compiler process it spawned."""
+  try:
+    try:
+      os.killpg(process.pid, signal.SIGTERM)
+    except ProcessLookupError:
+      pass
+
+    try:
+      process.wait(timeout=0.5)
+    except subprocess.TimeoutExpired:
+      pass
+
+    # The build-script process may have exited while a compiler that ignored
+    # TERM remains in its session. Always address the original process group
+    # once more before considering cleanup complete.
+    try:
+      os.killpg(process.pid, signal.SIGKILL)
+    except ProcessLookupError:
+      pass
+
+    try:
+      process.wait(timeout=1.0)
+    except subprocess.TimeoutExpired:
+      process.kill()
+      process.wait(timeout=1.0)
+  finally:
+    for pipe in (process.stdout, process.stderr):
+      if pipe is not None:
+        try:
+          pipe.close()
+        except OSError:
+          pass
+
+
 def ensure_native_binary(
   binary: Path = DEFAULT_BINARY,
   build_script: Path = DEFAULT_BUILD_SCRIPT,
@@ -258,22 +306,36 @@ def ensure_native_binary(
     if not build_script.is_file():
       raise BackendBuildError(f"native build script not found: {build_script}")
     try:
-      result = subprocess.run(
+      process = subprocess.Popen(
         [str(build_script), *build_arguments],
         cwd=repository_root,
         stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
-        timeout=timeout,
-        check=False,
+        start_new_session=True,
       )
-    except (OSError, subprocess.TimeoutExpired) as error:
+    except OSError as error:
       raise BackendBuildError(f"native simulator build failed: {error}") from error
-    if result.returncode != 0:
-      output = result.stdout.decode("utf-8", "replace")[-4_096:].strip()
+
+    try:
+      output_bytes, _unused_stderr = process.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired as error:
+      _terminate_build_process_group(process)
+      raise BackendBuildError(
+        f"native simulator build timed out after {timeout:g}s"
+      ) from error
+    except OSError as error:
+      _terminate_build_process_group(process)
+      raise BackendBuildError(f"native simulator build failed: {error}") from error
+    except BaseException:
+      _terminate_build_process_group(process)
+      raise
+
+    if process.returncode != 0:
+      output = output_bytes.decode("utf-8", "replace")[-4_096:].strip()
       suffix = f": {output}" if output else ""
       raise BackendBuildError(
-        f"native simulator build exited with status {result.returncode}{suffix}"
+        f"native simulator build exited with status {process.returncode}{suffix}"
       )
 
   if not binary.is_file():
@@ -572,3 +634,129 @@ class NativeSimulatorBackend:
           pipe.close()
         except OSError:
           pass
+
+
+class NativeSimulatorBackendManager:
+  """Own and transactionally replace one allowlisted native backend.
+
+  The manager is the serialization boundary used by the HTTP server.  A
+  replacement is constructed from the fixed firmware registry, started, and
+  queried before the current process is closed.  Consequently a build or
+  startup failure leaves the current simulator available.
+  """
+
+  def __init__(
+    self,
+    *,
+    firmware_id: str = DEFAULT_FIRMWARE_ID,
+    backend_factory: Callable[[str], NativeSimulatorBackend] | None = None,
+  ) -> None:
+    initial_id = firmware_spec(firmware_id).firmware_id
+    self._lock = threading.RLock()
+    self._closed = False
+    self._backend_factory = backend_factory or self._create_native_backend
+    self._backend: NativeSimulatorBackend | None = None
+    self._active_firmware_id = initial_id
+    backend = self._build_backend(initial_id)
+    self._backend = backend
+
+  @staticmethod
+  def _create_native_backend(firmware_id: str) -> NativeSimulatorBackend:
+    # ``firmware_id`` has already been resolved through ``firmware_spec``.
+    # NativeSimulatorBackend performs the same exact-registry validation again
+    # before selecting any source, binary, or build argument.
+    return NativeSimulatorBackend(firmware_id=firmware_id)
+
+  def __enter__(self) -> NativeSimulatorBackendManager:
+    return self
+
+  def __exit__(self, *_args: object) -> None:
+    self.close()
+
+  @property
+  def firmware_id(self) -> str:
+    with self._lock:
+      self._require_open_locked()
+      return self._active_firmware_id
+
+  def firmwares(self) -> dict[str, Any]:
+    with self._lock:
+      self._require_open_locked()
+      return firmware_catalog(self._active_firmware_id)
+
+  def snapshot(self) -> dict[str, Any]:
+    with self._lock:
+      return self._backend_locked().snapshot()
+
+  def perform_action(self, action: object) -> dict[str, Any]:
+    with self._lock:
+      return self._backend_locked().perform_action(action)
+
+  def configure(self, mapping: object) -> dict[str, Any]:
+    with self._lock:
+      return self._backend_locked().configure(mapping)
+
+  def reset(self) -> dict[str, Any]:
+    with self._lock:
+      self._require_open_locked()
+      return self._replace_backend_locked(self._active_firmware_id)
+
+  def switch_firmware(self, firmware_id: object) -> dict[str, Any]:
+    """Switch to an allowlisted firmware and return its first snapshot."""
+    target_id = firmware_spec(firmware_id).firmware_id
+    with self._lock:
+      return self._replace_backend_locked(target_id)
+
+  def close(self) -> None:
+    with self._lock:
+      if self._closed:
+        return
+      self._closed = True
+      backend = self._backend
+      self._backend = None
+      if backend is not None:
+        backend.close()
+
+  def _backend_locked(self) -> NativeSimulatorBackend:
+    self._require_open_locked()
+    assert self._backend is not None
+    return self._backend
+
+  def _require_open_locked(self) -> None:
+    if self._closed:
+      raise BackendProcessError("native simulator backend manager is closed")
+
+  def _replace_backend_locked(self, target_id: str) -> dict[str, Any]:
+    current = self._backend_locked()
+    candidate = self._build_backend(target_id)
+    try:
+      snapshot = candidate.snapshot()
+    except BaseException:
+      candidate.close()
+      raise
+
+    # The candidate is known-good before the current child is touched. Both
+    # close and swap happen while all state/action requests are excluded. This
+    # path is shared by firmware selection and reset so a failed rebuild never
+    # strands the manager without its previously healthy process.
+    try:
+      current.close()
+    except BaseException:
+      candidate.close()
+      raise
+    self._backend = candidate
+    self._active_firmware_id = target_id
+    return snapshot
+
+  def _build_backend(self, firmware_id: str) -> NativeSimulatorBackend:
+    target_id = firmware_spec(firmware_id).firmware_id
+    backend = self._backend_factory(target_id)
+    actual_id = getattr(backend, "firmware_id", None)
+    if actual_id != target_id:
+      try:
+        backend.close()
+      finally:
+        raise BackendProtocolError(
+          f"managed backend identity mismatch: expected {target_id}, got {actual_id!r}"
+        )
+    return backend

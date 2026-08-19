@@ -16,7 +16,7 @@ else
 override SIMULATOR_FIRMWARE := unsupported
 endif
 
-.PHONY: help build build-all test simulator-build simulator simulator-serve simulator-test companion companion-pair companion-once companion-test clean device-info backup flash monitor
+.PHONY: help build build-all test simulator-build simulator simulator-serve simulator-test workbench-install workbench-build workbench companion companion-pair companion-once companion-test macos-app macos-dmg clean device-info backup flash monitor
 
 help: ## Show the available commands
 	@awk 'BEGIN {FS = ":.*## "; printf "Usage: make <target> [ENV=name] [FIRMWARE=10_sokkon|99_stopwatch] [PORT=/dev/cu.usbmodem...] [ARGS=\"...\"]\n\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-18s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -41,6 +41,21 @@ simulator-serve: simulator-build ## Start selected local simulator without openi
 
 simulator-test: simulator-build ## Run native-runner, process-bridge, and HTTP/static-UI tests
 	@python3 -m unittest discover -s test_simulator -v
+
+workbench-install: ## Install the desktop workbench UI dependencies
+	@npm --prefix simulator/workbench install --prefer-offline --no-audit --no-fund
+
+workbench-build: ## Build the distributable desktop workbench frontend
+	@npm --prefix simulator/workbench run build
+
+workbench: ## Run the Firmware Workbench UI and switchable native backend
+	@FIRMWARE="$(SIMULATOR_FIRMWARE)" ./scripts/run-workbench.sh
+
+macos-app: ## Build the standalone M5Stack Simulator.app for this Mac
+	@./macos/M5StackSimulator/scripts/build-app.sh --adhoc-sign
+
+macos-dmg: macos-app ## Package the local app as a versioned DMG with SHA-256
+	@./macos/M5StackSimulator/scripts/build-dmg.sh
 
 companion: ## Run the local-first macOS Sokkon USB companion (pass ARGS="...")
 	@python3 -m companion $(ARGS)

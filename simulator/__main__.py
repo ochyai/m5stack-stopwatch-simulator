@@ -13,7 +13,7 @@ from .backend import (
   BackendError,
   DEFAULT_FIRMWARE_ID,
   SUPPORTED_FIRMWARE_IDS,
-  NativeSimulatorBackend,
+  NativeSimulatorBackendManager,
 )
 from .server import DEFAULT_HOST, DEFAULT_PORT, create_server
 
@@ -86,7 +86,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     print("WARNING: simulator controls are exposed beyond this Mac", file=sys.stderr)
 
   try:
-    with NativeSimulatorBackend(firmware_id=args.firmware) as backend:
+    with NativeSimulatorBackendManager(firmware_id=args.firmware) as backend:
       server = create_server(backend, host=args.host, port=args.port)
       try:
         bound_port = server.server_address[1]

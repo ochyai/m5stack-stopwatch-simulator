@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+import ipaddress
 import json
 import logging
 import mimetypes
@@ -14,7 +15,13 @@ import threading
 from typing import Any
 from urllib.parse import unquote_to_bytes, urlsplit
 
-from .backend import BackendError, BackendInputError, normalize_action, normalize_configuration
+from .backend import (
+  BackendError,
+  BackendInputError,
+  firmware_spec,
+  normalize_action,
+  normalize_configuration,
+)
 
 
 LOGGER = logging.getLogger(__name__)
@@ -22,6 +29,74 @@ DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8_765
 MAX_BODY_BYTES = 64 * 1024
 DEFAULT_STATIC_DIRECTORY = Path(__file__).resolve().parent / "static"
+
+
+def _reject_duplicate_json_fields(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+  """Build a JSON object while refusing ambiguous duplicate field names."""
+  result: dict[str, Any] = {}
+  for key, value in pairs:
+    if key in result:
+      raise ValueError(f"duplicate JSON field: {key}")
+    result[key] = value
+  return result
+
+
+def _canonical_hostname(hostname: str) -> str:
+  normalized = hostname.rstrip(".").lower()
+  try:
+    return ipaddress.ip_address(normalized).compressed
+  except ValueError:
+    return normalized
+
+
+def _hostname_is_loopback(hostname: str) -> bool:
+  normalized = _canonical_hostname(hostname)
+  if normalized == "localhost":
+    return True
+  try:
+    address = ipaddress.ip_address(normalized)
+  except ValueError:
+    return False
+  if address.is_loopback:
+    return True
+  mapped = getattr(address, "ipv4_mapped", None)
+  return mapped is not None and mapped.is_loopback
+
+
+def _parse_authority(value: str) -> tuple[str, int | None]:
+  if not value or any(character in value for character in "\0\r\n\t/?#@"):
+    raise ValueError("invalid authority")
+  parsed = urlsplit(f"//{value}")
+  if (
+    parsed.scheme
+    or parsed.username is not None
+    or parsed.password is not None
+    or parsed.path
+    or parsed.query
+    or parsed.fragment
+    or parsed.hostname is None
+  ):
+    raise ValueError("invalid authority")
+  port = parsed.port  # Access validates malformed and out-of-range ports.
+  return _canonical_hostname(parsed.hostname), port
+
+
+def _parse_origin(value: str) -> tuple[str, str, int]:
+  parsed = urlsplit(value)
+  if (
+    parsed.scheme not in ("http", "https")
+    or parsed.username is not None
+    or parsed.password is not None
+    or parsed.hostname is None
+    or parsed.path
+    or parsed.query
+    or parsed.fragment
+  ):
+    raise ValueError("invalid origin")
+  port = parsed.port
+  if port is None:
+    port = 443 if parsed.scheme == "https" else 80
+  return parsed.scheme, _canonical_hostname(parsed.hostname), port
 
 
 class RequestError(Exception):
@@ -59,6 +134,7 @@ class SimulatorHTTPServer(ThreadingHTTPServer):
     self.backend_lock = threading.RLock()
     self.static_directory = static_directory.resolve()
     super().__init__(server_address, SimulatorRequestHandler)
+    self.loopback_binding = _hostname_is_loopback(str(self.server_address[0]))
 
 
 class IPv6SimulatorHTTPServer(SimulatorHTTPServer):
@@ -117,7 +193,21 @@ class SimulatorRequestHandler(BaseHTTPRequestHandler):
         body = self._backend_json(lambda: self.server.backend.configure(payload))
         self._send_json_bytes(HTTPStatus.OK, body)
         return
-      if path in ("/healthz", "/api/state"):
+      if path == "/api/firmware":
+        payload = self._read_json_object()
+        if set(payload) != {"firmware"}:
+          raise RequestError(
+            HTTPStatus.BAD_REQUEST,
+            "invalid_firmware_request",
+            "firmware request must contain exactly one 'firmware' field",
+          )
+        target_id = firmware_spec(payload["firmware"]).firmware_id
+        body = self._backend_json(
+          lambda: self.server.backend.switch_firmware(target_id)
+        )
+        self._send_json_bytes(HTTPStatus.OK, body)
+        return
+      if path in ("/healthz", "/api/state", "/api/firmwares"):
         self._send_method_not_allowed("GET, HEAD")
         return
       if path.startswith("/api/"):
@@ -152,7 +242,19 @@ class SimulatorRequestHandler(BaseHTTPRequestHandler):
   def do_OPTIONS(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler API
     # Deliberately no CORS opt-in.  application/json POSTs from a foreign page
     # must fail their browser preflight before reaching local simulator state.
-    self._send_method_not_allowed("GET, HEAD, POST")
+    try:
+      path = self._request_path()
+      if path in ("/api/action", "/api/scenario", "/api/firmware"):
+        allow = "POST"
+      elif path in ("/healthz", "/api/state", "/api/firmwares"):
+        allow = "GET, HEAD"
+      else:
+        allow = "GET, HEAD, POST"
+      self._send_method_not_allowed(allow)
+    except RequestError as error:
+      if error.close_connection:
+        self.close_connection = True
+      self._send_error_json(error.status, error.code, error.message)
 
   def send_error(
     self,
@@ -181,7 +283,11 @@ class SimulatorRequestHandler(BaseHTTPRequestHandler):
         body = self._backend_json(lambda: self.server.backend.snapshot())
         self._send_json_bytes(HTTPStatus.OK, body, head_only=head_only)
         return
-      if path in ("/api/action", "/api/scenario"):
+      if path == "/api/firmwares":
+        body = self._backend_json(lambda: self.server.backend.firmwares())
+        self._send_json_bytes(HTTPStatus.OK, body, head_only=head_only)
+        return
+      if path in ("/api/action", "/api/scenario", "/api/firmware"):
         self._send_method_not_allowed("POST", head_only=head_only)
         return
       if path.startswith("/api/"):
@@ -194,6 +300,8 @@ class SimulatorRequestHandler(BaseHTTPRequestHandler):
         return
       self._serve_static(path, head_only=head_only)
     except RequestError as error:
+      if error.close_connection:
+        self.close_connection = True
       self._send_error_json(
         error.status,
         error.code,
@@ -218,6 +326,7 @@ class SimulatorRequestHandler(BaseHTTPRequestHandler):
       )
 
   def _request_path(self) -> str:
+    self._validate_request_authority()
     if not self.path.startswith("/") or self.path.startswith("//"):
       raise RequestError(HTTPStatus.BAD_REQUEST, "invalid_path", "invalid request path")
     parsed = urlsplit(self.path)
@@ -231,6 +340,76 @@ class SimulatorRequestHandler(BaseHTTPRequestHandler):
         "invalid_path",
         "request path must be valid UTF-8",
       ) from error
+
+  def _validate_request_authority(self) -> None:
+    host_values = self.headers.get_all("Host", [])
+    if len(host_values) != 1:
+      raise RequestError(
+        HTTPStatus.BAD_REQUEST,
+        "invalid_host",
+        "one valid Host header is required",
+        close_connection=True,
+      )
+    try:
+      host, host_port = _parse_authority(host_values[0])
+    except ValueError as error:
+      raise RequestError(
+        HTTPStatus.BAD_REQUEST,
+        "invalid_host",
+        "one valid Host header is required",
+        close_connection=True,
+      ) from error
+
+    if self.server.loopback_binding:
+      expected_port = int(self.server.server_address[1])
+      effective_host_port = 80 if host_port is None else host_port
+      if not _hostname_is_loopback(host) or effective_host_port != expected_port:
+        raise RequestError(
+          HTTPStatus.FORBIDDEN,
+          "untrusted_host",
+          "Host must identify this loopback simulator",
+          close_connection=True,
+        )
+
+    origin_values = self.headers.get_all("Origin", [])
+    if not origin_values:
+      return
+    if len(origin_values) != 1:
+      raise RequestError(
+        HTTPStatus.FORBIDDEN,
+        "cross_origin_request",
+        "request origin is not trusted",
+        close_connection=True,
+      )
+    try:
+      origin_scheme, origin_host, origin_port = _parse_origin(origin_values[0])
+    except ValueError as error:
+      raise RequestError(
+        HTTPStatus.FORBIDDEN,
+        "cross_origin_request",
+        "request origin is not trusted",
+        close_connection=True,
+      ) from error
+
+    if self.server.loopback_binding:
+      # The Workbench intentionally proxies from another loopback port. Treat
+      # loopback origins as one local development trust boundary while refusing
+      # DNS-rebinding names and every public/private-network web origin.
+      trusted_origin = _hostname_is_loopback(origin_host)
+    else:
+      effective_host_port = 80 if host_port is None else host_port
+      trusted_origin = (
+        origin_scheme == "http"
+        and origin_host == host
+        and origin_port == effective_host_port
+      )
+    if not trusted_origin:
+      raise RequestError(
+        HTTPStatus.FORBIDDEN,
+        "cross_origin_request",
+        "request origin is not trusted",
+        close_connection=True,
+      )
 
   def _read_json_object(self) -> dict[str, Any]:
     transfer_encodings = self.headers.get_all("Transfer-Encoding", [])
@@ -319,6 +498,7 @@ class SimulatorRequestHandler(BaseHTTPRequestHandler):
       text = body.decode("utf-8")
       payload = json.loads(
         text,
+        object_pairs_hook=_reject_duplicate_json_fields,
         parse_constant=lambda value: (_ for _ in ()).throw(
           ValueError(f"invalid JSON constant {value}")
         ),
