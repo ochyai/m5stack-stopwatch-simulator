@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
+    <meta name="theme-color" content="#090b0c">
+    <title>SOKKON Simulator</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="/static/app.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#scenario-controls">シナリオ設定へ移動</a>
+
+    <header class="topbar">
+      <div class="brand" aria-label="SOKKON simulator">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span class="brand-word">SOKKON</span>
+        <span class="brand-divider" aria-hidden="true"></span>
+        <span class="brand-subtitle">DIGITAL TWIN</span>
+      </div>
+      <div class="api-state" data-testid="api-status" aria-live="polite">
+        <span class="api-dot" aria-hidden="true"></span>
+        <span id="api-status-text">CONNECTING</span>
+        <span id="revision-label" class="revision">R—</span>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <section class="device-column" aria-labelledby="device-heading">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">M5STACK STOPWATCH · 466 × 466</p>
+            <h1 id="device-heading">いまを、手で扱う。</h1>
+          </div>
+          <div class="live-badge" aria-label="Live state polling at approximately 100 milliseconds">
+            <span aria-hidden="true"></span> LIVE 100 MS
+          </div>
+        </div>
+
+        <div id="device-slot" class="device-slot">
+          <div id="device-scaler" class="device-scaler">
+            <div class="device-shadow" aria-hidden="true"></div>
+
+            <div class="device-shell">
+              <div class="crown-notch crown-notch-top" aria-hidden="true"></div>
+              <div class="crown-notch crown-notch-bottom" aria-hidden="true"></div>
+
+              <button
+                id="mark-button"
+                class="hardware-button hardware-button-a"
+                type="button"
+                aria-label="黄色 A ボタン: 現在をマーク"
+                aria-keyshortcuts="A"
+                data-testid="mark-button"
+              >
+                <span class="button-cap" aria-hidden="true"></span>
+                <span class="button-callout"><kbd>A</kbd><strong>MARK</strong></span>
+              </button>
+
+              <button
+                id="mode-button"
+                class="hardware-button hardware-button-b"
+                type="button"
+                aria-label="青 B ボタン: モードを切り替え"
+                aria-keyshortcuts="B"
+                data-testid="mode-button"
+              >
+                <span class="button-cap" aria-hidden="true"></span>
+                <span class="button-callout"><kbd>B</kbd><strong>MODE</strong></span>
+              </button>
+
+              <div
+                id="amoled-face"
+                class="amoled-face"
+                role="group"
+                aria-label="SOKKON device screen"
+                data-testid="device-screen"
+              >
+                <canvas
+                  id="device-canvas"
+                  class="device-canvas"
+                  width="466"
+                  height="466"
+                  aria-hidden="true"
+                  data-testid="device-canvas"
+                ></canvas>
+
+                <div id="screen-content" class="screen-content sr-only" aria-live="polite">
+                  <div class="screen-status" data-testid="screen-status">
+                    <span class="connection-symbol" aria-hidden="true"></span>
+                    <span id="screen-connection">LOCAL</span>
+                    <span class="status-separator" aria-hidden="true"></span>
+                    <span class="battery-mini" aria-hidden="true"><i id="battery-fill"></i></span>
+                    <span id="screen-battery">0%</span>
+                    <span id="charging-mark" class="charging-mark" aria-label="charging" hidden>+</span>
+                  </div>
+
+                  <time id="screen-time" class="screen-time" data-testid="screen-time">--:--</time>
+                  <div id="screen-mode" class="screen-mode" data-testid="screen-mode">NOW</div>
+                  <div id="screen-context" class="screen-context" data-testid="screen-context">MAC NOT CONNECTED</div>
+                  <div id="screen-detail" class="screen-detail" data-testid="screen-detail">USB-C TO BEGIN</div>
+
+                  <div id="focus-state" class="focus-state" data-testid="focus-state">
+                    <span class="focus-dot" aria-hidden="true"></span>
+                    <span id="focus-state-text">FOCUS / PAUSED</span>
+                  </div>
+                  <div id="elapsed-time" class="elapsed-time" data-testid="elapsed-time">00:00:00</div>
+
+                  <div class="face-legend face-legend-a" aria-hidden="true">
+                    <span></span> MARK
+                  </div>
+                  <div class="face-legend face-legend-b" aria-hidden="true">
+                    MODE <span></span>
+                  </div>
+                  <div class="touch-hint" aria-hidden="true">TOUCH&nbsp;&nbsp; FOCUS</div>
+                  <div id="mark-count" class="mark-count" data-testid="mark-count">MARKS 0</div>
+                </div>
+
+                <button
+                  id="focus-button"
+                  class="touch-zone"
+                  type="button"
+                  aria-label="中央タッチ: フォーカスタイマーを開始または一時停止"
+                  aria-keyshortcuts="Space"
+                  data-testid="focus-button"
+                ><span>TOUCH</span></button>
+
+                <div id="screen-toast" class="screen-toast sr-only" role="status" aria-live="polite" hidden data-testid="screen-toast">
+                  MARK SENT
+                </div>
+
+                <div id="sleep-overlay" class="sleep-overlay" hidden data-testid="sleep-overlay">
+                  <button id="wake-button" type="button">画面を起こす</button>
+                </div>
+              </div>
+
+              <div id="pending-indicator" class="pending-indicator" hidden data-testid="pending-indicator">
+                <span aria-hidden="true"></span>
+                <span id="pending-label">WAITING FOR MAC</span>
+              </div>
+
+              <div class="shell-label" aria-hidden="true">
+                <span>SOKKON</span>
+                <small>LOCAL FIRST INTERFACE</small>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="keyboard-guide" aria-label="Keyboard shortcuts">
+          <span><kbd>A</kbd> MARK</span>
+          <span><kbd>B</kbd> MODE</span>
+          <span><kbd>SPACE</kbd> FOCUS</span>
+        </div>
+      </section>
+
+      <aside class="control-column" aria-label="Simulator controls and event log">
+        <section id="scenario-controls" class="panel scenario-panel" aria-labelledby="scenario-heading">
+          <div class="panel-heading">
+            <div>
+              <p class="panel-kicker">HOST CONDITIONS</p>
+              <h2 id="scenario-heading">Scenario</h2>
+            </div>
+            <button id="reset-button" class="quiet-button" type="button" data-testid="reset-button">RESET</button>
+          </div>
+
+          <div class="scenario-grid">
+            <label class="switch-row" for="connected-input">
+              <span>
+                <strong>Mac connection</strong>
+                <small>USB host heartbeat</small>
+              </span>
+              <input id="connected-input" type="checkbox" data-scenario="connected" data-testid="connected-input">
+              <span class="switch" aria-hidden="true"></span>
+            </label>
+
+            <div class="field-group">
+              <p id="outcome-label" class="field-label">Result outcome</p>
+              <div class="segmented" role="radiogroup" aria-labelledby="outcome-label" data-testid="outcome-control">
+                <input id="outcome-ok" type="radio" name="outcome" value="OK" data-scenario="outcome">
+                <label for="outcome-ok">OK</label>
+                <input id="outcome-error" type="radio" name="outcome" value="ERROR" data-scenario="outcome">
+                <label for="outcome-error">ERROR</label>
+                <input id="outcome-timeout" type="radio" name="outcome" value="TIMEOUT" data-scenario="outcome">
+                <label for="outcome-timeout">TIMEOUT</label>
+              </div>
+            </div>
+
+            <div class="field-group range-field">
+              <div class="label-line">
+                <label for="latency-input">Host latency</label>
+                <output id="latency-output" for="latency-input">400 ms</output>
+              </div>
+              <input id="latency-input" type="range" min="0" max="5000" step="50" value="400" data-scenario="latency_ms" data-testid="latency-input">
+            </div>
+
+            <div class="field-group">
+              <p id="time-controls-label" class="field-label">Virtual time · production constants</p>
+              <div class="time-controls" role="group" aria-labelledby="time-controls-label" data-testid="time-controls">
+                <button type="button" data-advance="advance_6s"><strong>+6s</strong><span>HOST LOST</span></button>
+                <button type="button" data-advance="advance_30s"><strong>+30s</strong><span>RESULT</span></button>
+                <button type="button" data-advance="advance_2m"><strong>+2m</strong><span>DIM</span></button>
+                <button type="button" data-advance="advance_10m"><strong>+10m</strong><span>SLEEP</span></button>
+              </div>
+            </div>
+
+            <div class="field-group two-up">
+              <label for="mode-input">
+                <span>Host mode</span>
+                <select id="mode-input" data-scenario="host_mode" data-testid="mode-input">
+                  <option>NOW</option>
+                  <option>BUILD</option>
+                  <option>READ</option>
+                  <option>MEET</option>
+                  <option>PRESENT</option>
+                  <option>REST</option>
+                </select>
+              </label>
+              <label for="battery-input">
+                <span>Battery</span>
+                <span class="compact-input"><input id="battery-input" type="number" min="0" max="100" step="1" value="84" data-scenario="battery_percent" data-testid="battery-input"><span>%</span></span>
+              </label>
+            </div>
+
+            <label class="switch-row compact-switch" for="charging-input">
+              <span>
+                <strong>Charging</strong>
+                <small>External power state</small>
+              </span>
+              <input id="charging-input" type="checkbox" data-scenario="charging" data-testid="charging-input">
+              <span class="switch" aria-hidden="true"></span>
+            </label>
+
+            <div class="field-group">
+              <label for="context-input">Frontmost app / context</label>
+              <input id="context-input" type="text" maxlength="39" value="CODEX" placeholder="CODEX" data-scenario="context" data-testid="context-input">
+            </div>
+
+            <div class="field-group">
+              <label for="detail-input">Detail</label>
+              <input id="detail-input" type="text" maxlength="63" value="BUILDING SOKKON" placeholder="BUILDING SOKKON" data-scenario="detail" data-testid="detail-input">
+            </div>
+          </div>
+        </section>
+
+        <section class="panel telemetry-panel" aria-labelledby="telemetry-heading">
+          <div class="panel-heading telemetry-heading-row">
+            <div>
+              <p class="panel-kicker">DEVICE FEEDBACK</p>
+              <h2 id="telemetry-heading">Protocol &amp; haptics</h2>
+            </div>
+            <div id="haptic-readout" class="haptic-readout" data-testid="haptic-readout">
+              <span class="haptic-glyph" aria-hidden="true"><i></i><i></i><i></i></span>
+              <span id="haptic-label">IDLE</span>
+            </div>
+          </div>
+
+          <div id="protocol-log" class="protocol-log" role="log" aria-live="polite" aria-relevant="additions" data-testid="protocol-log">
+            <div class="log-empty">
+              <span aria-hidden="true">⌁</span>
+              <p>イベントを待っています</p>
+              <small>A / B / SPACE で操作</small>
+            </div>
+          </div>
+        </section>
+      </aside>
+    </main>
+
+    <footer class="footer">
+      <span>NO CLOUD · NO EXTERNAL ASSETS · LOCALHOST ONLY</span>
+      <span id="poll-diagnostic">API —</span>
+    </footer>
+  </body>
+</html>

@@ -2,6 +2,7 @@
 .pio/
 .piolibdeps/
 compile_commands.json
+.simulator/
 
 # Local editor state (keep the shared recommendations/settings below)
 .vscode/*

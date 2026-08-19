@@ -65,3 +65,20 @@ jobs:
 
       - name: Run companion tests
         run: python -m unittest discover -s test_companion -v
+
+  simulator:
+    name: Test compiler-driven simulator
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Compile production SOKKON and run simulator tests
+        run: make simulator-test

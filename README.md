@@ -49,6 +49,23 @@ pairing中はprotocol v2 handshakeだけを行い、前面アプリ名、`STATE`
 
 MARKはMacがMarkdownを`fsync`できた後だけ強い確定振動を返します。未接続と明示的な保存失敗は「未保存」ですが、30秒応答がない場合は、保存後の応答だけ失われた可能性もあるため`SAVE UNKNOWN`と表示します。この場合はinboxを確認してから再試行してください。任意shellは実行せず、追加アクションはJSON configに名前を明示したmacOS Shortcutだけです。設計、USB protocol v2、プライバシー境界、次の実験は [SOKKON設計](docs/SOKKON.md) を参照してください。
 
+## Macで先に動かす — compiler-driven simulator
+
+実機へ書き込む前に、SOKKONの本番`main.cpp`と`board.cpp`をMacのC++コンパイラで直接動かせます。ブラウザは別実装のモックではなく、本番C++が出した466 × 466の描画命令と状態を表示します。ボタン、中央タッチ、USB接続、保存成功・失敗・応答欠落、時間経過をブラウザから試せます。
+
+```bash
+# 本番C++をコンパイルし、localhostで起動してブラウザを開く
+make simulator
+
+# ブラウザを開かず起動。追加引数も渡せる
+make simulator-serve ARGS="--port 9000"
+
+# native runner、process bridge、HTTP/static UIの回帰テスト
+make simulator-test
+```
+
+既定URLは`http://127.0.0.1:8765/`です。外部サービスや実機は不要です。仕組み、操作、保証範囲は [SOKKON Mac Simulator](docs/SIMULATOR.md) を参照してください。
+
 ## できること
 
 - ストップウォッチ、ラップタイマー、ポモドーロ、アラーム、独自ウォッチフェイス
@@ -106,13 +123,14 @@ pio device monitor -e 00_smoke --port /dev/cu.usbmodemXXXX
 | `99_stopwatch` | ストップウォッチ本体 |
 | `native` | ホスト上でのロジック単体テスト |
 
-既定環境は `10_sokkon` です。全ファームウェアとロジックテストは `make build-all`、端末非依存テストは `make test`、Mac companionは `make companion-test` で確認できます。
+既定環境は `10_sokkon` です。全ファームウェアとロジックテストは `make build-all`、端末非依存の純粋ロジックは `make test`、Mac companionは `make companion-test`、本番SOKKON全体をhost compilerで動かす統合テストは`make simulator-test`で確認できます。
 
 ## 開発方法
 
 このリポジトリでは **PlatformIO CLI を正本**にします。VS Code + PlatformIO 拡張からも同じ `platformio.ini` を利用できます。Arduino IDE、UiFlow2、ESP-IDF も選択肢ですが、同じ端末へ別方式のファームウェアを書けば現在の内容は上書きされます。
 
 - [開発環境とコーディング手順](docs/DEVELOPMENT.md)
+- [本番C++を動かすMac Simulator](docs/SIMULATOR.md)
 - [書き込み、バックアップ、工場ファーム復元](docs/FLASHING.md)
 - [公式一次資料](docs/REFERENCES.md)
 
@@ -122,9 +140,11 @@ pio device monitor -e 00_smoke --port /dev/cu.usbmodemXXXX
 firmware/apps/       機能別ファームウェア
 firmware/shared/     共通のボード初期化とロジック
 companion/           追加依存なしの macOS USB companion
+simulator/           本番C++を動かすnative HAL、process bridge、browser UI
 scripts/             ビルド、ポート検出、バックアップ、書き込み
 test/                PC 上で動かす単体テスト
 test_companion/      companion の単体・PTY統合テスト
+test_simulator/      compiler-driven simulatorの統合・HTTPテスト
 docs/                ハードウェア、開発、復旧、アイデア、参照資料
 platformio.ini       固定したビルド環境と依存ライブラリ
 ```

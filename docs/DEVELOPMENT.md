@@ -110,6 +110,30 @@ make monitor ENV=00_smoke PORT=/dev/cu.usbmodemXXXX
 
 安全な導入順は `00_smoke` → `01_display_input` → `02_imu` → `03_rtc_power` → 必要な単機能 → `10_sokkon` です。純粋なストップウォッチだけを使う場合は `99_stopwatch` を選びます。
 
+## Compiler-driven simulator
+
+SOKKONは、実機用とは別の状態機械をMac側へ移植せず、本番の`firmware/apps/10_sokkon/main.cpp`と`firmware/shared/board.cpp`をhost C++ compilerで直接実行できます。Arduino、M5Unified、ESP32固有APIだけを`simulator/native/`の薄いHALへ差し替え、`setup()`と`loop()`は本番と同じものを呼びます。
+
+```bash
+# Apple ClangまたはGCCでnative runnerだけをビルド
+make simulator-build
+
+# localhost:8765でbrowser UIを開く
+make simulator
+
+# 自動openなし。server引数はARGSで渡す
+make simulator-serve ARGS="--port 9000"
+
+# production C++、native process、HTTP/static UIをまとめて検証
+make simulator-test
+```
+
+生成した実行ファイルは`.simulator/`へ置かれ、Gitには含めません。GitHub ActionsもUbuntuのhost compilerで同じ本番ソースをビルドして`test_simulator/`を実行します。
+
+PlatformIOの`native`環境とcompiler-driven simulatorは役割が異なります。`make test`は抽出した純粋ロジックを高速に単体検証し、`make simulator-test`は本番`setup()` / `loop()`、描画、protocol parserまで統合して検証します。
+
+画面やprotocolを変更するときは、ロジックをPythonやJavaScriptへ複製せず、本番C++を変更します。新しく使うArduino/M5Unified APIがあればHALへ観測可能な効果を追加し、`make simulator-test`を通してから実機で物理特性を確認します。詳しい構造、仮想時間、保証境界は [SIMULATOR.md](SIMULATOR.md) を参照してください。
+
 ## Mac companion
 
 SOKKONはmacOS標準のPython 3機能とPOSIX serial APIだけで動き、`pyserial`を必要としません。

@@ -24,6 +24,7 @@ M5Stack StopWatch（C152）のハードウェアを、安全かつ再現可能�
 - シリアル速度は原則 115200 bps。Wi-Fi パスワード、API キー、個人情報をコードやログへ保存しない。
 - Mac companionの通常起動はpersistent device bindingを必須とし、実機device IDやbinding fileをcommitしない。
 - Mac companionは任意shell commandを実行しない。外部アクションはconfigで名前を明示したmacOS Shortcutだけに限定する。CAPTUREのRESULT OKはMarkdown `fsync`を保証し、Shortcutはlauncher起動時点でprotocol RESULTを返す。workflowの後発結果はTerminal logで扱う。
+- Mac simulatorは`firmware/apps/10_sokkon/main.cpp`と`firmware/shared/board.cpp`そのものをホストC++コンパイラでビルドする。画面・入力・protocolの状態機械をPythonやJavaScriptへ複製しない。ファームウェアのUI、タイマー、protocolを変えたらnative simulatorとparity testも同時に確認する。
 - ビルド生成物、`.pio/`、工場 Flash バックアップ、秘密情報をコミットしない。
 - ファイル編集は既存のユーザー変更を保持し、依頼範囲外の整形・置換をしない。
 
@@ -53,6 +54,9 @@ make test
 
 # Mac companionの単体・PTY統合テスト
 make companion-test
+
+# 本番SOKKON C++をMac/CI向けHALでコンパイルし、simulatorを統合テスト
+make simulator-test
 ```
 
 実機書き込みは副作用がある。端末、環境名、シリアルポートを確認してから実行する。
