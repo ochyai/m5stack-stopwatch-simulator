@@ -25,7 +25,10 @@ def append_capture(path: Path, record: CaptureRecord) -> str:
 
   target = path.expanduser()
   target.parent.mkdir(parents=True, exist_ok=True)
-  timestamp = record.timestamp.astimezone().isoformat(timespec="seconds")
+  captured_at = record.timestamp
+  if captured_at.tzinfo is None or captured_at.utcoffset() is None:
+    captured_at = captured_at.astimezone()
+  timestamp = captured_at.isoformat(timespec="seconds")
   mode = sanitize_field(record.mode, max_length=16)
   context = sanitize_field(record.context, max_length=160)
   focus = sanitize_field(record.focus, max_length=16)
