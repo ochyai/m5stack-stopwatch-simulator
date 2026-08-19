@@ -1,6 +1,6 @@
-# M5Stack StopWatch 開発リポジトリ
+# M5Stack StopWatch / SOKKON 開発リポジトリ
 
-M5Stack StopWatch（C152）を、Mac から再現可能な形で調査・開発するためのリポジトリです。丸形 AMOLED、タッチ、2 ボタン、6 軸 IMU、RTC、マイク、スピーカー、振動、Wi-Fi / Bluetooth LE、外部 I2C を、機能ごとの小さなファームウェアで確認できます。
+M5Stack StopWatch（C152）を、Mac から再現可能な形で調査・開発するためのリポジトリです。既定アプリ **SOKKON / 即今** は、この丸い端末を「現在の文脈を物理的に支える界面」に変えます。丸形 AMOLED、タッチ、2 ボタン、6 軸 IMU、RTC、マイク、スピーカー、振動、Wi-Fi / Bluetooth LE、外部 I2C は、機能別ファームウェアからも確認できます。
 
 > [!CAUTION]
 > 一部ロットでは背面端子の `BAT` 印字が誤っています。実際は外部電源用の **5V IN** です。リチウム電池を接続しないでください。M5Stack 公式の訂正事項です。
@@ -22,6 +22,32 @@ M5Stack StopWatch（C152）を、Mac から再現可能な形で調査・開発�
 心拍、SpO2、GPS/GNSS、温湿度・気圧などの環境センサー、カメラ、microSD は内蔵していません。必要なら Port A または背面バスへ外付けします。防水・防滴等級は公式仕様で確認できないため、水に濡らさない前提で扱います。
 
 詳細は [ハードウェア情報](docs/HARDWARE.md) を参照してください。
+
+## いま使う — SOKKON / 即今
+
+USB Type-C でMacにつなぎ、標準ライブラリだけのcompanionを起動します。companion自身はネットワーク通信を行わず、前面アプリ名だけを現在の文脈として端末へ表示します。既定保存先の`Documents`は、macOS / iCloud設定によってOSが同期する場合があります。
+
+```bash
+# 初回だけ: 工場Flashをバックアップした後、SOKKONを書き込む
+make build ENV=10_sokkon
+make flash ENV=10_sokkon PORT=/dev/cu.usbmodemXXXX
+
+# 初回だけ: 物理接続中のdevice IDをMacへpairする
+make companion-pair ARGS="--port /dev/cu.usbmodemXXXX"
+
+# pair後の日常利用: USB companionを起動する
+make companion
+```
+
+pairing中はprotocol v2 handshakeだけを行い、前面アプリ名、`STATE`、actionを送信しません。device IDは既定で`~/.config/sokkon/device.json`へ保存され、以後の通常起動はbindingと一致する端末だけを受け入れます。別個体へ意図的に交換する手順やtrust boundaryは [SOKKON設計](docs/SOKKON.md) を参照してください。
+
+| 操作 | 結果 |
+| --- | --- |
+| 黄色 A | `~/Documents/Sokkon Inbox.md` へ現在時刻・mode・前面アプリ・focus時間をMARK |
+| 青 B | `NOW → BUILD → READ → MEET → PRESENT → REST` を循環 |
+| 画面中央 | FOCUS timerを開始 / 一時停止 |
+
+MARKはMacがMarkdownを`fsync`できた後だけ強い確定振動を返します。未接続と明示的な保存失敗は「未保存」ですが、30秒応答がない場合は、保存後の応答だけ失われた可能性もあるため`SAVE UNKNOWN`と表示します。この場合はinboxを確認してから再試行してください。任意shellは実行せず、追加アクションはJSON configに名前を明示したmacOS Shortcutだけです。設計、USB protocol v2、プライバシー境界、次の実験は [SOKKON設計](docs/SOKKON.md) を参照してください。
 
 ## できること
 
@@ -76,10 +102,11 @@ pio device monitor -e 00_smoke --port /dev/cu.usbmodemXXXX
 | `05_wifi_scan` | 2.4 GHz Wi-Fi スキャン |
 | `07_ble_gatt` | Bluetooth LE GATT |
 | `08_external_i2c` | Port A の I2C スキャン |
+| `10_sokkon` | Mac連携の即今インターフェース（既定） |
 | `99_stopwatch` | ストップウォッチ本体 |
 | `native` | ホスト上でのロジック単体テスト |
 
-既定環境は `99_stopwatch` です。全ファームウェアとロジックテストは `make build-all`、テストだけなら `make test` で確認できます。
+既定環境は `10_sokkon` です。全ファームウェアとロジックテストは `make build-all`、端末非依存テストは `make test`、Mac companionは `make companion-test` で確認できます。
 
 ## 開発方法
 
@@ -94,8 +121,10 @@ pio device monitor -e 00_smoke --port /dev/cu.usbmodemXXXX
 ```text
 firmware/apps/       機能別ファームウェア
 firmware/shared/     共通のボード初期化とロジック
+companion/           追加依存なしの macOS USB companion
 scripts/             ビルド、ポート検出、バックアップ、書き込み
 test/                PC 上で動かす単体テスト
+test_companion/      companion の単体・PTY統合テスト
 docs/                ハードウェア、開発、復旧、アイデア、参照資料
 platformio.ini       固定したビルド環境と依存ライブラリ
 ```

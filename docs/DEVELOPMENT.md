@@ -50,6 +50,7 @@ make help
 - 16 MB Flash partition
 - QIO / OPI memory mode、8 MB PSRAM
 - USB CDC on boot
+- `10_sokkon`だけは継承した`CORE_DEBUG_LEVEL=5`を解除し、libraryのverbose logがUSB protocol frameへ混入しない構成
 - 安定性を優先した 460800 baud の初期書き込み
 - M5Unified、M5GFX、M5PM1、M5IOE1
 
@@ -60,7 +61,7 @@ make help
 ### ビルド
 
 ```bash
-# 既定の 99_stopwatch
+# 既定の 10_sokkon
 make build
 
 # 1 機能だけ
@@ -103,10 +104,40 @@ make monitor ENV=00_smoke PORT=/dev/cu.usbmodemXXXX
 | `05_wifi_scan` | Wi-Fi | 2.4 GHz AP スキャン。認証情報不要 |
 | `07_ble_gatt` | Bluetooth LE | Advertising、GATT 接続 |
 | `08_external_i2c` | 外部拡張 | Port A の G10 SDA / G11 SCL スキャン |
+| `10_sokkon` | Mac連携 | MARK、mode、focus、USB companion、確定feedback |
 | `99_stopwatch` | 統合アプリ | 開始・一時停止・リセット、UI、RTC |
 | `native` | PC テスト | ハードウェア非依存の状態遷移 |
 
-安全な導入順は `00_smoke` → `01_display_input` → `02_imu` → `03_rtc_power` → 必要な単機能 → `99_stopwatch` です。
+安全な導入順は `00_smoke` → `01_display_input` → `02_imu` → `03_rtc_power` → 必要な単機能 → `10_sokkon` です。純粋なストップウォッチだけを使う場合は `99_stopwatch` を選びます。
+
+## Mac companion
+
+SOKKONはmacOS標準のPython 3機能とPOSIX serial APIだけで動き、`pyserial`を必要としません。
+
+```bash
+# 初回だけ: handshakeのみで接続中の端末をpairする
+make companion-pair
+
+# 自動検出した /dev/cu.usbmodem* へ接続し続ける
+make companion
+
+# 接続とSTATE送信だけを短く確認
+make companion-once
+
+# configやportを明示する
+make companion ARGS="--port /dev/cu.usbmodemXXXX --config companion/config.example.json"
+
+# 単体・擬似端末（PTY）統合テスト
+make companion-test
+```
+
+初回の`make companion-pair`は`PING`とREADY / PONG handshakeだけを行い、`STATE`、前面アプリ名、actionを一切送らずに終了します。確認した12桁hex device IDは既定で`~/.config/sokkon/device.json`へ、mode `0600`、fileとdirectoryの`fsync`、atomic replaceで保存します。通常の`make companion`はbindingを必須とし、期待したdevice IDと一致しない端末を拒否します。同じprocess内のserial reconnectでもdevice IDをpinし続けます。
+
+保存先を変える場合はpair時と通常起動の両方へ`--binding /absolute/path/device.json`を渡します。別個体へbindingを交換するときだけ、物理的に対象を確認したうえで`make companion-pair ARGS="--replace-binding"`を使います。`--replace-binding`はpair時以外には使えません。実機のdevice IDやbinding fileはrepositoryへ記載・commitしません。
+
+これは暗号認証ではなく、初回の物理USB接続を信頼起点にしたpersistent pairingです。選択したserial port、protocol version、保存済みdevice ID、起動ごとのsession IDを検査しますが、IDを知るdeviceによるなりすましをcryptographicに防ぐものではありません。
+
+前面アプリ名の取得には固定したJXA / AppKitスクリプトを`/usr/bin/osascript`へ引数配列で渡します。ウィンドウタイトル、本文、キー入力、画面は読みません。任意shell commandは実行せず、Shortcutもconfigに明記した名前だけを`/usr/bin/shortcuts run`で非同期起動します。serial loopは完了を待たず、background reaperが30秒上限でprocessを回収します。Shortcut workflowの最終成功はprotocol RESULTの保証に含みません。companion自身はnetwork connectionを開きませんが、`Documents`配下の保存fileはmacOS / iCloud設定によりOSが同期する場合があります。詳細は [SOKKON.md](SOKKON.md) を参照してください。
 
 ## 最小コードの考え方
 

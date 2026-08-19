@@ -92,7 +92,7 @@ make build ENV=00_smoke
 pio run -e 00_smoke
 ```
 
-既定の統合アプリは `99_stopwatch` です。利用可能な環境は `pio project config` または `platformio.ini` で確認できます。
+既定の統合アプリはMac連携の `10_sokkon` です。純粋なストップウォッチは `99_stopwatch` を使います。利用可能な環境は `pio project config` または `platformio.ini` で確認できます。
 
 ## 5. 書き込む
 
@@ -128,7 +128,8 @@ pio device monitor -e 00_smoke --port /dev/cu.usbmodemXXXX
 6. `05_wifi_scan`: 認証情報なしの Wi-Fi scan
 7. `07_ble_gatt`: BLE GATT
 8. `08_external_i2c`: 外付け機器を確認してから Port A
-9. `99_stopwatch`: 統合アプリ
+9. `10_sokkon`: Mac連携のSOKKON統合アプリ
+10. `99_stopwatch`: 純粋なストップウォッチ
 
 問題が起きたら、外付け機器を外して一段前の環境か `00_smoke` へ戻します。
 

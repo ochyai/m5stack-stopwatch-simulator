@@ -14,3 +14,5 @@ backups/
 # Operating-system and local tooling noise
 .DS_Store
 *.log
+__pycache__/
+*.py[cod]

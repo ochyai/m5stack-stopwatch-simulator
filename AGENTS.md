@@ -4,7 +4,7 @@
 
 ## 目的
 
-M5Stack StopWatch（C152）のハードウェアを、安全かつ再現可能に調査・開発する。PlatformIO / Arduino を主経路とし、機能ごとの小さなファームウェア、共通コード、ホストテスト、実機手順を保守する。
+M5Stack StopWatch（C152）のハードウェアを、安全かつ再現可能に調査・開発する。PlatformIO / Arduino を主経路とし、機能ごとの小さなファームウェア、共通コード、Mac companion、ホストテスト、実機手順を保守する。
 
 ## 作業前に読むもの
 
@@ -22,6 +22,8 @@ M5Stack StopWatch（C152）のハードウェアを、安全かつ再現可能�
 - 新しい機能は、既存の総合アプリへ直書きする前に、単機能の実験環境で確認する。
 - メインループでは毎回 `M5.update()` または `c152::update()` を呼ぶ。長い `delay()` や無期限ブロックを避ける。
 - シリアル速度は原則 115200 bps。Wi-Fi パスワード、API キー、個人情報をコードやログへ保存しない。
+- Mac companionの通常起動はpersistent device bindingを必須とし、実機device IDやbinding fileをcommitしない。
+- Mac companionは任意shell commandを実行しない。外部アクションはconfigで名前を明示したmacOS Shortcutだけに限定する。CAPTUREのRESULT OKはMarkdown `fsync`を保証し、Shortcutはlauncher起動時点でprotocol RESULTを返す。workflowの後発結果はTerminal logで扱う。
 - ビルド生成物、`.pio/`、工場 Flash バックアップ、秘密情報をコミットしない。
 - ファイル編集は既存のユーザー変更を保持し、依頼範囲外の整形・置換をしない。
 
@@ -48,6 +50,9 @@ make build-all
 
 # ハードウェア非依存ロジック
 make test
+
+# Mac companionの単体・PTY統合テスト
+make companion-test
 ```
 
 実機書き込みは副作用がある。端末、環境名、シリアルポートを確認してから実行する。
