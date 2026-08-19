@@ -1,0 +1,15 @@
+{
+  "C_Cpp.clang_format_style": "file",
+  "C_Cpp.default.configurationProvider": "platformio.platformio-ide",
+  "editor.formatOnSave": true,
+  "files.associations": {
+    "*.ino": "cpp"
+  },
+  "platformio-ide.disablePIOHomeStartup": true,
+  "[c]": {
+    "editor.defaultFormatter": "ms-vscode.cpptools"
+  },
+  "[cpp]": {
+    "editor.defaultFormatter": "ms-vscode.cpptools"
+  }
+}

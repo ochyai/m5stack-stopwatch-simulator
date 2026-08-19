@@ -1,0 +1,16 @@
+# PlatformIO build products and generated metadata
+.pio/
+.piolibdeps/
+compile_commands.json
+
+# Local editor state (keep the shared recommendations/settings below)
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# Factory flash dumps are device-specific and may contain private data
+backups/
+
+# Operating-system and local tooling noise
+.DS_Store
+*.log
