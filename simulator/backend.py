@@ -1,4 +1,4 @@
-"""Process bridge to the compiler-driven SOKKON native simulator.
+"""Process bridge to the compiler-driven native firmware simulators.
 
 The Python layer deliberately owns no device state-machine semantics.  It sends
 strict, tab-delimited commands to the native executable and accepts exactly one
@@ -8,11 +8,13 @@ NDJSON snapshot for each command.
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
+from dataclasses import dataclass
 import json
 import math
 import os
 from pathlib import Path
 import selectors
+import shlex
 import subprocess
 import threading
 import time
@@ -20,8 +22,39 @@ from typing import Any
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_BINARY = REPOSITORY_ROOT / ".simulator" / "sokkon-native"
 DEFAULT_BUILD_SCRIPT = REPOSITORY_ROOT / "scripts" / "build-simulator.sh"
+
+
+@dataclass(frozen=True)
+class FirmwareSpec:
+  """Allowlisted production firmware and its native adapter."""
+
+  firmware_id: str
+  label: str
+  main_source: str
+  runner_source: str
+  binary_name: str
+
+
+FIRMWARE_SPECS = {
+  "10_sokkon": FirmwareSpec(
+    firmware_id="10_sokkon",
+    label="SOKKON",
+    main_source="firmware/apps/10_sokkon/main.cpp",
+    runner_source="simulator/native/runner.cpp",
+    binary_name="sokkon-native",
+  ),
+  "99_stopwatch": FirmwareSpec(
+    firmware_id="99_stopwatch",
+    label="STOPWATCH",
+    main_source="firmware/apps/99_stopwatch/main.cpp",
+    runner_source="simulator/native/stopwatch_runner.cpp",
+    binary_name="stopwatch-native",
+  ),
+}
+DEFAULT_FIRMWARE_ID = "10_sokkon"
+SUPPORTED_FIRMWARE_IDS = tuple(FIRMWARE_SPECS)
+DEFAULT_BINARY = REPOSITORY_ROOT / ".simulator" / FIRMWARE_SPECS[DEFAULT_FIRMWARE_ID].binary_name
 
 ACTION_COMMANDS = {
   "mark": "MARK",
@@ -72,6 +105,17 @@ class BackendProtocolError(BackendError):
 
 class BackendTimeoutError(BackendError, TimeoutError):
   """The child failed to answer within the command deadline."""
+
+
+def firmware_spec(firmware_id: object) -> FirmwareSpec:
+  """Resolve a simulator firmware by exact, fixed-registry identifier."""
+  if not isinstance(firmware_id, str):
+    raise BackendInputError("firmware id must be a string")
+  try:
+    return FIRMWARE_SPECS[firmware_id]
+  except KeyError as error:
+    expected = ", ".join(SUPPORTED_FIRMWARE_IDS)
+    raise BackendInputError(f"unsupported firmware; expected one of: {expected}") from error
 
 
 def normalize_action(action: object) -> str:
@@ -138,14 +182,25 @@ def normalize_configuration(mapping: object) -> dict[str, str]:
   return encoded
 
 
-def native_sources(repository_root: Path = REPOSITORY_ROOT) -> tuple[Path, ...]:
+def native_sources(
+  repository_root: Path = REPOSITORY_ROOT,
+  *,
+  firmware_id: str = DEFAULT_FIRMWARE_ID,
+) -> tuple[Path, ...]:
   """Return source files whose modification makes the native binary stale."""
+  spec = firmware_spec(firmware_id)
+  dependency_files = tuple(
+    repository_root / ".simulator" / f"{spec.binary_name}.{unit}.d"
+    for unit in ("runner", "board")
+  )
   candidates: list[Path] = [
     repository_root / "scripts" / "build-simulator.sh",
-    repository_root / "firmware" / "apps" / "10_sokkon" / "main.cpp",
+    repository_root / spec.main_source,
+    repository_root / spec.runner_source,
+    *dependency_files,
   ]
   for directory in (
-    repository_root / "simulator" / "native",
+    repository_root / "simulator" / "native" / "include",
     repository_root / "firmware" / "shared",
   ):
     if directory.is_dir():
@@ -154,6 +209,21 @@ def native_sources(repository_root: Path = REPOSITORY_ROOT) -> tuple[Path, ...]:
         for path in directory.rglob("*")
         if path.is_file() and path.suffix in (".c", ".cc", ".cpp", ".h", ".hh", ".hpp")
       )
+  for dependency_file in dependency_files:
+    if not dependency_file.is_file():
+      continue
+    try:
+      dependency_text = dependency_file.read_text(encoding="utf-8")
+      logical_lines = dependency_text.replace("\\\n", " ").splitlines()
+      for line in logical_lines:
+        if not line.strip():
+          continue
+        dependency_list = line.split(":", 1)[1]
+        candidates.extend(Path(value) for value in shlex.split(dependency_list))
+    except (IndexError, OSError, ValueError):
+      # A malformed dependency manifest must force a rebuild, not silently
+      # trust an artifact whose inputs cannot be established.
+      candidates.append(repository_root / ".simulator" / ".invalid-dependency-manifest")
   return tuple(candidates)
 
 
@@ -163,10 +233,14 @@ def binary_is_stale(binary: Path, sources: Iterable[Path]) -> bool:
     binary_mtime = binary.stat().st_mtime_ns
   except FileNotFoundError:
     return True
-  return any(
-    source.is_file() and source.stat().st_mtime_ns > binary_mtime
-    for source in sources
-  )
+  for source in sources:
+    try:
+      source_mtime = source.stat().st_mtime_ns
+    except FileNotFoundError:
+      return True
+    if source_mtime > binary_mtime:
+      return True
+  return False
 
 
 def ensure_native_binary(
@@ -175,6 +249,7 @@ def ensure_native_binary(
   *,
   sources: Iterable[Path] | None = None,
   repository_root: Path = REPOSITORY_ROOT,
+  build_arguments: Iterable[str] = (),
   timeout: float = 120.0,
 ) -> None:
   """Build the native simulator when its executable is missing or stale."""
@@ -184,7 +259,7 @@ def ensure_native_binary(
       raise BackendBuildError(f"native build script not found: {build_script}")
     try:
       result = subprocess.run(
-        [str(build_script)],
+        [str(build_script), *build_arguments],
         cwd=repository_root,
         stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
@@ -205,6 +280,8 @@ def ensure_native_binary(
     raise BackendBuildError(f"native simulator binary was not produced: {binary}")
   if not os.access(binary, os.X_OK):
     raise BackendBuildError(f"native simulator binary is not executable: {binary}")
+  if binary_is_stale(binary, source_files):
+    raise BackendBuildError("native simulator binary remained stale after build")
 
 
 class NativeSimulatorBackend:
@@ -214,6 +291,7 @@ class NativeSimulatorBackend:
     self,
     binary_path: str | os.PathLike[str] | None = None,
     *,
+    firmware_id: str = DEFAULT_FIRMWARE_ID,
     build_script: str | os.PathLike[str] | None = None,
     repository_root: str | os.PathLike[str] = REPOSITORY_ROOT,
     source_paths: Iterable[str | os.PathLike[str]] | None = None,
@@ -222,15 +300,31 @@ class NativeSimulatorBackend:
     build_timeout: float = 120.0,
     max_line_bytes: int = 4 * 1024 * 1024,
   ) -> None:
+    self.firmware = firmware_spec(firmware_id)
+    self.firmware_id = self.firmware.firmware_id
+    self.repository_root = Path(repository_root).expanduser().resolve()
     explicit_binary = binary_path is not None
-    self.binary_path = Path(binary_path) if explicit_binary else DEFAULT_BINARY
-    self.build_script = Path(build_script) if build_script is not None else DEFAULT_BUILD_SCRIPT
-    self.repository_root = Path(repository_root)
-    self.source_paths = (
-      tuple(Path(path) for path in source_paths)
-      if source_paths is not None
-      else native_sources(self.repository_root)
+    selected_binary = (
+      Path(binary_path) if explicit_binary else Path(".simulator") / self.firmware.binary_name
     )
+    if not selected_binary.is_absolute():
+      selected_binary = self.repository_root / selected_binary
+    self.binary_path = selected_binary.resolve()
+    selected_build_script = (
+      Path(build_script) if build_script is not None else Path("scripts/build-simulator.sh")
+    )
+    if not selected_build_script.is_absolute():
+      selected_build_script = self.repository_root / selected_build_script
+    self.build_script = selected_build_script.resolve()
+    self.source_paths = (
+      tuple(
+        path if path.is_absolute() else self.repository_root / path
+        for path in (Path(value) for value in source_paths)
+      )
+      if source_paths is not None
+      else native_sources(self.repository_root, firmware_id=self.firmware_id)
+    )
+    self._verify_firmware_identity = not explicit_binary
     self.auto_build = (not explicit_binary) if auto_build is None else auto_build
     if command_timeout <= 0:
       raise ValueError("command_timeout must be positive")
@@ -310,6 +404,7 @@ class NativeSimulatorBackend:
         self.build_script,
         sources=self.source_paths,
         repository_root=self.repository_root,
+        build_arguments=("--firmware", self.firmware_id),
         timeout=self.build_timeout,
       )
     elif not self.binary_path.is_file() or not os.access(self.binary_path, os.X_OK):
@@ -338,6 +433,8 @@ class NativeSimulatorBackend:
       name="sokkon-native-stderr",
       daemon=True,
     ).start()
+    if self._verify_firmware_identity:
+      self._exchange_locked("SNAPSHOT")
 
   def _drain_stderr(self, process: subprocess.Popen[bytes], pipe: Any) -> None:
     try:
@@ -392,6 +489,13 @@ class NativeSimulatorBackend:
       )
       if not isinstance(snapshot, dict):
         raise BackendProtocolError("native response must be a JSON object")
+      if self._verify_firmware_identity:
+        firmware = snapshot.get("firmware")
+        actual_id = firmware.get("id") if isinstance(firmware, dict) else None
+        if actual_id != self.firmware_id:
+          raise BackendProtocolError(
+            f"native firmware identity mismatch: expected {self.firmware_id}, got {actual_id!r}"
+          )
       return snapshot
     except BackendError as error:
       self._break_locked(str(error))

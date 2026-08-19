@@ -1,8 +1,10 @@
 #pragma once
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <deque>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -30,6 +32,7 @@ struct DrawCommand {
 
 struct Runtime {
   uint64_t now_us = 0;
+  uint64_t advance_limit_us = std::numeric_limits<uint64_t>::max();
   int brightness = 96;
   int battery_percent = 84;
   bool charging = false;
@@ -38,6 +41,12 @@ struct Runtime {
   bool touch_pressed = false;
   int32_t touch_x = 233;
   int32_t touch_y = 233;
+  float imu_accel_x = 0.12F;
+  float imu_accel_y = -0.08F;
+  float imu_accel_z = 0.99F;
+  float imu_gyro_x = 0.0F;
+  float imu_gyro_y = 0.0F;
+  float imu_gyro_z = 0.0F;
   uint8_t vibration = 0;
   uint8_t last_vibration = 0;
   uint32_t haptic_pulses = 0;
@@ -57,7 +66,15 @@ inline uint32_t millis32() {
 inline uint64_t micros64() { return runtime().now_us; }
 
 inline void advanceMs(uint64_t milliseconds) {
-  runtime().now_us += milliseconds * 1000ULL;
+  auto& state = runtime();
+  const uint64_t delta =
+      milliseconds > std::numeric_limits<uint64_t>::max() / 1000ULL
+          ? std::numeric_limits<uint64_t>::max()
+          : milliseconds * 1000ULL;
+  const uint64_t maximum_delta =
+      std::numeric_limits<uint64_t>::max() - state.now_us;
+  const uint64_t next = state.now_us + std::min(delta, maximum_delta);
+  state.now_us = std::min(next, state.advance_limit_us);
 }
 
 }  // namespace sokkon_sim

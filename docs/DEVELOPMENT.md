@@ -112,7 +112,7 @@ make monitor ENV=00_smoke PORT=/dev/cu.usbmodemXXXX
 
 ## Compiler-driven simulator
 
-SOKKONは、実機用とは別の状態機械をMac側へ移植せず、本番の`firmware/apps/10_sokkon/main.cpp`と`firmware/shared/board.cpp`をhost C++ compilerで直接実行できます。Arduino、M5Unified、ESP32固有APIだけを`simulator/native/`の薄いHALへ差し替え、`setup()`と`loop()`は本番と同じものを呼びます。
+SOKKONと`99_stopwatch`は、実機用とは別の状態機械をMac側へ移植せず、それぞれの本番`main.cpp`と`firmware/shared/board.cpp`をhost C++ compilerで直接実行できます。Arduino、M5Unified、ESP32固有APIだけを`simulator/native/`の薄いHALへ差し替え、`setup()`と`loop()`は本番と同じものを呼びます。
 
 ```bash
 # Apple ClangまたはGCCでnative runnerだけをビルド
@@ -120,6 +120,9 @@ make simulator-build
 
 # localhost:8765でbrowser UIを開く
 make simulator
+
+# 別の本番ストップウォッチを同じbrowser UIで動かす
+make simulator FIRMWARE=99_stopwatch
 
 # 自動openなし。server引数はARGSで渡す
 make simulator-serve ARGS="--port 9000"

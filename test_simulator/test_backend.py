@@ -15,8 +15,13 @@ from simulator.backend import (
   BackendTimeoutError,
   NativeSimulatorBackend,
   binary_is_stale,
+  firmware_spec,
+  native_sources,
   normalize_configuration,
 )
+
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 FAKE_NATIVE = r"""
@@ -163,6 +168,39 @@ class NativeBackendTest(unittest.TestCase):
     self.assertFalse(binary_is_stale(self.binary, [source]))
     os.utime(source, ns=(now + 20, now + 20))
     self.assertTrue(binary_is_stale(self.binary, [source]))
+    self.assertTrue(binary_is_stale(self.binary, [self.directory / "deleted.hpp"]))
+
+  def test_managed_binary_rejects_a_mismatched_firmware_identity(self) -> None:
+    managed = self.directory / ".simulator" / "sokkon-native"
+    managed.parent.mkdir()
+    managed.write_text(
+      "#!/usr/bin/env python3\n"
+      "import json, sys\n"
+      "for _line in sys.stdin:\n"
+      " print(json.dumps({'firmware': {'id': '99_stopwatch'}}), flush=True)\n",
+      encoding="utf-8",
+    )
+    managed.chmod(0o700)
+    with self.assertRaisesRegex(BackendProtocolError, "identity mismatch"):
+      NativeSimulatorBackend(
+        firmware_id="10_sokkon",
+        repository_root=self.directory,
+        auto_build=False,
+      )
+
+  def test_firmware_registry_is_exact_and_tracks_only_the_selected_main(self) -> None:
+    self.assertEqual(firmware_spec("10_sokkon").binary_name, "sokkon-native")
+    self.assertEqual(firmware_spec("99_stopwatch").binary_name, "stopwatch-native")
+    for invalid in ("../99_stopwatch", "/tmp/main.cpp", "99_STOPWATCH", None):
+      with self.subTest(invalid=invalid), self.assertRaises(BackendInputError):
+        firmware_spec(invalid)
+
+    sokkon_sources = native_sources(ROOT, firmware_id="10_sokkon")
+    stopwatch_sources = native_sources(ROOT, firmware_id="99_stopwatch")
+    self.assertIn(ROOT / "firmware/apps/10_sokkon/main.cpp", sokkon_sources)
+    self.assertNotIn(ROOT / "firmware/apps/99_stopwatch/main.cpp", sokkon_sources)
+    self.assertIn(ROOT / "firmware/apps/99_stopwatch/main.cpp", stopwatch_sources)
+    self.assertNotIn(ROOT / "firmware/apps/10_sokkon/main.cpp", stopwatch_sources)
 
 
 if __name__ == "__main__":

@@ -107,6 +107,30 @@ class StaticSimulatorUITest(unittest.TestCase):
     self.assertIn("px -apple-system", font_function)
     self.assertIn("context.font = fontForCommand(command, renderState)", javascript)
     self.assertIn("context.fillText(text, x, y)", javascript)
+    self.assertIn("function renderFirmware", javascript)
+    self.assertIn("renderFirmware(snapshot.firmware || {})", javascript)
+    for field in (
+      "primary_label",
+      "secondary_label",
+      "touch_label",
+    ):
+      self.assertIn(field, javascript)
+    self.assertIn("if (!state.hostControls) return devicePayload", javascript)
+    self.assertIn('state.stateSemantics === "stopwatch"', javascript)
+    self.assertIn('control.disabled = !hostControls', javascript)
+
+    html = (STATIC / "index.html").read_text(encoding="utf-8")
+    self.assertIn('id="device-accessibility-summary"', html)
+    self.assertNotIn('id="device-accessibility-summary" class="sr-only" aria-live', html)
+    self.assertIn('id="screen-content" class="screen-content sr-only" aria-hidden="true"', html)
+    self.assertGreaterEqual(html.count("data-host-control"), 6)
+    self.assertEqual(html.count('class="panel scenario-panel"'), 1)
+    self.assertEqual(html.count('class="panel telemetry-panel"'), 1)
+    self.assertLess(html.index('class="panel scenario-panel"'), html.index('class="panel telemetry-panel"'))
+    self.assertIn("elements.screenConnection.textContent", javascript)
+    self.assertIn("elements.screenContext.textContent", javascript)
+    self.assertIn("elements.screenDetail.textContent", javascript)
+    self.assertIn("elements.accessibilitySummary.textContent !== accessibilitySummary", javascript)
 
   def test_css_uses_shell_image_and_places_upper_side_buttons(self) -> None:
     css = (STATIC / "style.css").read_text(encoding="utf-8")

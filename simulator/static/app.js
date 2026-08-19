@@ -13,6 +13,25 @@
   const COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
 
   const elements = {
+    brand: document.getElementById("simulator-brand"),
+    brandWord: document.getElementById("brand-word"),
+    brandSubtitle: document.getElementById("brand-subtitle"),
+    deviceHeading: document.getElementById("device-heading"),
+    primaryActionLabel: document.getElementById("primary-action-label"),
+    secondaryActionLabel: document.getElementById("secondary-action-label"),
+    touchActionLabel: document.getElementById("touch-action-label"),
+    shellLabel: document.getElementById("shell-label"),
+    shellSubtitle: document.getElementById("shell-subtitle"),
+    keyboardPrimary: document.getElementById("keyboard-primary"),
+    keyboardSecondary: document.getElementById("keyboard-secondary"),
+    keyboardTouch: document.getElementById("keyboard-touch"),
+    accessibilitySummary: document.getElementById("device-accessibility-summary"),
+    scenarioKicker: document.getElementById("scenario-kicker"),
+    scenarioHeading: document.getElementById("scenario-heading"),
+    firmwareControlNote: document.getElementById("firmware-control-note"),
+    timeControlsLabel: document.getElementById("time-controls-label"),
+    hostControls: document.querySelectorAll("[data-host-control]"),
+    advanceLabels: document.querySelectorAll("[data-advance] span"),
     apiState: document.querySelector(".api-state"),
     apiStatusText: document.getElementById("api-status-text"),
     revision: document.getElementById("revision-label"),
@@ -66,6 +85,9 @@
     online: false,
     requestStartedAt: 0,
     sleeping: false,
+    firmwareLabel: "SOKKON",
+    stateSemantics: "sokkon",
+    hostControls: true,
   };
 
   const canvasContext = elements.canvas.getContext("2d", { alpha: false });
@@ -305,6 +327,62 @@
     elements.canvas.dataset.commandCount = String(commands.length);
   }
 
+  function renderFirmware(firmware = {}) {
+    const label = safeText(firmware.label, "SOKKON").trim() || "SOKKON";
+    const subtitle = safeText(firmware.subtitle, "DIGITAL TWIN").trim() || "DIGITAL TWIN";
+    const shellSubtitle = safeText(firmware.shell_subtitle, "LOCAL FIRST INTERFACE").trim() || "LOCAL FIRST INTERFACE";
+    const heading = safeText(firmware.heading, "いまを、手で扱う。");
+    const primary = safeText(firmware.primary_label, "MARK").trim() || "MARK";
+    const secondary = safeText(firmware.secondary_label, "MODE").trim() || "MODE";
+    const touch = safeText(firmware.touch_label, "FOCUS").trim() || "FOCUS";
+    const primaryAria = safeText(firmware.primary_aria, primary).trim() || primary;
+    const secondaryAria = safeText(firmware.secondary_aria, secondary).trim() || secondary;
+    const touchAria = safeText(firmware.touch_aria, touch).trim() || touch;
+    const hostControls = firmware.host_controls !== false;
+
+    state.firmwareLabel = label;
+    state.stateSemantics = safeText(firmware.state_semantics, "sokkon");
+    state.hostControls = hostControls;
+
+    elements.brandWord.textContent = label;
+    elements.brandSubtitle.textContent = subtitle;
+    elements.deviceHeading.textContent = heading;
+    elements.primaryActionLabel.textContent = primary;
+    elements.secondaryActionLabel.textContent = secondary;
+    elements.touchActionLabel.textContent = touch;
+    elements.shellLabel.textContent = label;
+    elements.shellSubtitle.textContent = shellSubtitle;
+    elements.keyboardPrimary.textContent = primary;
+    elements.keyboardSecondary.textContent = secondary;
+    elements.keyboardTouch.textContent = touch;
+    elements.brand.setAttribute("aria-label", `${label} simulator`);
+    elements.face.setAttribute("aria-label", `${label} device screen`);
+    elements.markButton.setAttribute("aria-label", `黄色 A ボタン: ${primaryAria}`);
+    elements.modeButton.setAttribute("aria-label", `青 B ボタン: ${secondaryAria}`);
+    elements.focusButton.setAttribute("aria-label", `中央タッチ: ${touchAria}`);
+    elements.scenarioKicker.textContent = hostControls ? "HOST CONDITIONS" : "DEVICE CONDITIONS";
+    elements.scenarioHeading.textContent = hostControls ? "Scenario" : "Stopwatch simulation";
+    elements.firmwareControlNote.hidden = hostControls;
+    elements.firmwareControlNote.textContent = hostControls
+      ? ""
+      : "Mac連携専用の設定は無効です。仮想時間、電池、充電状態は操作できます。";
+    elements.hostControls.forEach((container) => {
+      container.classList.toggle("is-firmware-disabled", !hostControls);
+      container.setAttribute("aria-disabled", hostControls ? "false" : "true");
+      container.querySelectorAll("input, select, textarea, button").forEach((control) => {
+        control.disabled = !hostControls;
+      });
+    });
+    elements.timeControlsLabel.textContent = hostControls
+      ? "Virtual time · production constants"
+      : "Virtual time · production stopwatch";
+    elements.advanceLabels.forEach((labelElement) => {
+      if (!labelElement.dataset.sokkonLabel) labelElement.dataset.sokkonLabel = labelElement.textContent;
+      labelElement.textContent = hostControls ? labelElement.dataset.sokkonLabel : "ADVANCE";
+    });
+    document.title = `${label} Simulator`;
+  }
+
   async function apiRequest(path, options = {}) {
     const response = await fetch(path, {
       cache: "no-store",
@@ -356,7 +434,12 @@
     elements.markCount.textContent = `MARKS ${Math.max(0, Math.trunc(finiteNumber(screen.marks, 0)))}`;
 
     elements.sleepOverlay.hidden = !sleeping;
-    elements.face.setAttribute("aria-label", `${mode}, ${elements.screenTime.textContent}, ${focusRunning ? "focus running" : "focus paused"}, ${elements.markCount.textContent}`);
+    const accessibilitySummary = state.stateSemantics === "stopwatch"
+      ? `${state.firmwareLabel}、${focusRunning ? "計測中" : "一時停止"}、経過時間 ${elements.elapsedTime.textContent}、${elements.screenTime.textContent}、バッテリー ${Math.round(battery)}%${charging ? "、充電中" : ""}`
+      : `${state.firmwareLabel}、接続 ${elements.screenConnection.textContent}、バッテリー ${Math.round(battery)}%${charging ? "、充電中" : ""}、${mode}、${elements.screenTime.textContent}、${elements.screenContext.textContent}、${elements.screenDetail.textContent}、${focusRunning ? "フォーカス計測中" : "フォーカス一時停止"}、${elements.elapsedTime.textContent}、${elements.markCount.textContent}`;
+    if (elements.accessibilitySummary.textContent !== accessibilitySummary) {
+      elements.accessibilitySummary.textContent = accessibilitySummary;
+    }
 
     const toast = safeText(screen.toast).trim();
     elements.toast.textContent = toast;
@@ -554,6 +637,7 @@
   function renderSnapshot(snapshot) {
     if (!snapshot || typeof snapshot !== "object") throw new Error("Invalid state payload");
     const screen = { ...(snapshot.scenario || {}), ...(snapshot.screen || {}) };
+    renderFirmware(snapshot.firmware || {});
     renderFrame(snapshot.frame || {}, screen);
     renderScreen(screen);
     renderPending(snapshot.pending);
@@ -604,16 +688,20 @@
   }
 
   function scenarioPayload() {
+    const devicePayload = {
+      battery_percent: Math.round(clamp(elements.batteryInput.value, 0, 100)),
+      charging: elements.chargingInput.checked,
+    };
+    if (!state.hostControls) return devicePayload;
     const outcome = document.querySelector('input[name="outcome"]:checked');
     return {
+      ...devicePayload,
       connected: elements.connectedInput.checked,
       outcome: outcome ? outcome.value : "OK",
       latency_ms: Math.max(0, Math.trunc(finiteNumber(elements.latencyInput.value, 0))),
       context: elements.contextInput.value,
       detail: elements.detailInput.value,
       host_mode: elements.modeInput.value,
-      battery_percent: Math.round(clamp(elements.batteryInput.value, 0, 100)),
-      charging: elements.chargingInput.checked,
     };
   }
 

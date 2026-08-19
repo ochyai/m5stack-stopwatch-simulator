@@ -1,8 +1,8 @@
-# SOKKON Mac Simulator
+# M5Stack StopWatch Mac Simulator
 
-SOKKON simulatorは、ブラウザ上の見た目だけを模倣するモックではありません。製品ファームウェアの
-`firmware/apps/10_sokkon/main.cpp`と`firmware/shared/board.cpp`を、MacまたはLinuxのC++コンパイラで
-直接ビルドして実行する **compiler-driven digital twin** です。
+このsimulatorは、ブラウザ上の見た目だけを模倣するモックではありません。製品ファームウェアの
+`main.cpp`と`firmware/shared/board.cpp`を、MacまたはLinuxのC++コンパイラで直接ビルドして実行する
+**compiler-driven digital twin** です。現在はSOKKONと独立ストップウォッチの2本を選べます。
 
 ```bash
 # ビルド、native統合テスト、HTTP/static UIテスト
@@ -11,12 +11,26 @@ make simulator-test
 # localhostで起動して既定ブラウザを開く
 make simulator
 
+# 別の本番main.cppを同じnative HALでコンパイルして起動
+make simulator FIRMWARE=99_stopwatch
+
 # ブラウザを自動で開かず起動
 make simulator-serve
 ```
 
 既定URLは `http://127.0.0.1:8765/` です。外部サービス、CDN、クラウド、実機は使いません。
 Apple ClangまたはGCC系のC++ compilerとPython 3だけで動作し、追加のPython packageも不要です。
+
+## 対応ファームウェア
+
+| `FIRMWARE` | コンパイルする正本 | A / B / touch |
+| --- | --- | --- |
+| `10_sokkon`（既定） | `firmware/apps/10_sokkon/main.cpp` | MARK / MODE / FOCUS |
+| `99_stopwatch` | `firmware/apps/99_stopwatch/main.cpp` | start-pause / reset / start-pause |
+
+各ファームウェアは別native binaryと専用adapterを持ちます。adapterは本番の匿名namespaceにある状態を
+観測可能なsnapshotへ投影しますが、stopwatchやSOKKONの状態機械を複製しません。選択値は固定allowlist
+へ完全一致したIDだけで、選択値から任意パスやcompiler optionを組み立てられない設計です。
 
 ## なぜコードから動くのか
 
@@ -30,6 +44,7 @@ browser canvas ◀─ localhost HTTP API ◀─ Python process bridge┼─ prot
 ```
 
 `simulator/native/include/`にある薄いHALが、実機のArduino、M5Unified、ESP32 APIだけを置き換えます。
+以下はSOKKON adapterが実行する範囲です。
 `setup()`と`loop()`、ボタン分岐、タッチ判定、mode循環、focus timer、USB protocol v2、pending queue、
 5秒のhost切断、30秒の結果不明、2分のdim、10分のsleep、画面レイアウトは本番C++が実行します。
 ブラウザはC++から受け取った`fillScreen`、`drawCircle`、`drawArc`、`drawString`、`fillCircle`、
@@ -50,7 +65,7 @@ browser canvas ◀─ localhost HTTP API ◀─ Python process bridge┼─ prot
 だけをC152の上面リファレンスに沿って上へ寄せ、小型の矩形ボタンにする。表示開口は純黒で、文字、
 ロゴ、追加ボタン、端子を入れない」と指定しました。Canvasはその純黒開口へ本番C++の描画だけを重ねます。
 
-## 操作
+## SOKKONの操作
 
 | Simulator | 実機相当 | 確認できること |
 | --- | --- | --- |
@@ -67,6 +82,21 @@ browser canvas ◀─ localhost HTTP API ◀─ Python process bridge┼─ prot
 
 仮想時間はwall clockを待たずに進められます。たとえば`TIMEOUT`を選びMARKしたあと`+30s`を押すと、
 本番の`kResultTimeoutMs`を通って`SAVE UNKNOWN`になります。定数自体をsimulator向けに短縮してはいません。
+
+## 99_stopwatchの操作
+
+| Simulator | 実機相当 | 確認できること |
+| --- | --- | --- |
+| 黄色 A / `A` | BtnA | 計測の開始・一時停止 |
+| 青 B / `B` | BtnB | 経過時間を0へ戻し、停止 |
+| 画面中央 / `Space` | 中央touch | 計測の開始・一時停止 |
+| Battery / Charging | 電源HAL | 500ms周期で読む本番の電源表示 |
+| +6s / +30s / +2m / +10m | 仮想`millis()` | 本番loop、経過表示、外周arc、RTCの時間進行 |
+| RESET | 再起動 | C++ processと`StopwatchCore`の初期化 |
+
+`99_stopwatch`にMac host protocol、保存結果、mode、dim、sleepはありません。そのため右側パネルでは
+Mac連携専用のconnection、outcome、latency、host mode、context、detailを無効化し、時間、電池、充電だけを
+操作可能にします。`WAKE`もtouchへ読み替えずno-opです。
 
 ## 内部インターフェース
 
@@ -93,12 +123,12 @@ curl -H 'Content-Type: application/json' \
   http://127.0.0.1:8765/api/scenario
 ```
 
-server CLIは`--host`、`--port`、`--open` / `--no-open`を受け取ります。loopback以外へbindするときは
+server CLIは`--firmware`、`--host`、`--port`、`--open` / `--no-open`を受け取ります。loopback以外へbindするときは
 `--allow-remote`も必要です。このserverに認証やTLSはないため、信頼できないnetworkへ公開しません。
 
-native runnerは生成物なので`.simulator/sokkon-native`へ置かれ、Gitには保存しません。本番
-`main.cpp` / `board.cpp`、HAL、runtime、build scriptのどれかが新しくなれば、serverは起動前に
-再ビルドします。
+native runnerは生成物なのでSOKKONは`.simulator/sokkon-native`、独立ストップウォッチは
+`.simulator/stopwatch-native`へ置かれ、Gitには保存しません。選択した本番`main.cpp` / `board.cpp`、
+対応adapter、HAL、runtime、build scriptのどれかが新しくなれば、serverは起動前に再ビルドします。
 
 ## 保証する範囲と実機確認が残る範囲
 

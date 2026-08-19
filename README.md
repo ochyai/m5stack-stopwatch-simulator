@@ -51,11 +51,14 @@ MARKはMacがMarkdownを`fsync`できた後だけ強い確定振動を返しま�
 
 ## Macで先に動かす — compiler-driven simulator
 
-実機へ書き込む前に、SOKKONの本番`main.cpp`と`board.cpp`をMacのC++コンパイラで直接動かせます。ブラウザは別実装のモックではなく、本番C++が出した466 × 466の描画命令と状態を表示します。ボタン、中央タッチ、USB接続、保存成功・失敗・応答欠落、時間経過をブラウザから試せます。
+実機へ書き込む前に、本番`main.cpp`と`board.cpp`をMacのC++コンパイラで直接動かせます。ブラウザは別実装のモックではなく、本番C++が出した466 × 466の描画命令と状態を表示します。既定のSOKKONに加え、別の本番コード`99_stopwatch`も同じHALとCanvas経路で実行できます。
 
 ```bash
 # 本番C++をコンパイルし、localhostで起動してブラウザを開く
 make simulator
+
+# 別の本番コード: A/タッチで開始・停止、Bでリセット
+make simulator FIRMWARE=99_stopwatch
 
 # ブラウザを開かず起動。追加引数も渡せる
 make simulator-serve ARGS="--port 9000"
@@ -64,7 +67,7 @@ make simulator-serve ARGS="--port 9000"
 make simulator-test
 ```
 
-既定URLは`http://127.0.0.1:8765/`です。外部サービスや実機は不要です。仕組み、操作、保証範囲は [SOKKON Mac Simulator](docs/SIMULATOR.md) を参照してください。
+既定URLは`http://127.0.0.1:8765/`です。`FIRMWARE=10_sokkon`と`FIRMWARE=99_stopwatch`は固定レジストリからだけ選べ、選択値からファイルパスやコンパイラ引数を組み立てません。外部サービスや実機は不要です。仕組み、操作、保証範囲は [Mac Simulator](docs/SIMULATOR.md) を参照してください。
 
 ## できること
 

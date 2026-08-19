@@ -9,14 +9,25 @@ import sys
 from typing import Sequence
 import webbrowser
 
-from .backend import BackendError, NativeSimulatorBackend
+from .backend import (
+  BackendError,
+  DEFAULT_FIRMWARE_ID,
+  SUPPORTED_FIRMWARE_IDS,
+  NativeSimulatorBackend,
+)
 from .server import DEFAULT_HOST, DEFAULT_PORT, create_server
 
 
 def build_parser() -> argparse.ArgumentParser:
   parser = argparse.ArgumentParser(
     prog="python3 -m simulator",
-    description="Run the compiler-driven SOKKON simulator on this Mac.",
+    description="Run a compiler-driven M5Stack StopWatch firmware simulator on this Mac.",
+  )
+  parser.add_argument(
+    "--firmware",
+    choices=SUPPORTED_FIRMWARE_IDS,
+    default=DEFAULT_FIRMWARE_ID,
+    help=f"production firmware to compile and run (default: {DEFAULT_FIRMWARE_ID})",
   )
   parser.add_argument("--host", default=DEFAULT_HOST, help="bind host (default: 127.0.0.1)")
   parser.add_argument("--port", type=int, default=DEFAULT_PORT, help="bind port (default: 8765)")
@@ -75,17 +86,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     print("WARNING: simulator controls are exposed beyond this Mac", file=sys.stderr)
 
   try:
-    with NativeSimulatorBackend() as backend:
+    with NativeSimulatorBackend(firmware_id=args.firmware) as backend:
       server = create_server(backend, host=args.host, port=args.port)
       try:
         bound_port = server.server_address[1]
         url = browser_url(args.host, bound_port)
-        print(f"SOKKON simulator: {url}", flush=True)
+        print(f"M5Stack simulator [{args.firmware}]: {url}", flush=True)
         if args.open_browser:
           webbrowser.open(url)
         server.serve_forever(poll_interval=0.1)
       except KeyboardInterrupt:
-        print("\nSOKKON simulator stopped", file=sys.stderr)
+        print(f"\nM5Stack simulator [{args.firmware}] stopped", file=sys.stderr)
       finally:
         server.server_close()
   except (BackendError, OSError, ValueError) as error:

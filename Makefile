@@ -4,11 +4,22 @@ SHELL := /bin/bash
 ENV ?=
 PORT ?=
 ARGS ?=
+FIRMWARE ?= 10_sokkon
+
+# Recipes only receive one of these trusted constants. A command-line make
+# variable is never interpolated into a shell command verbatim.
+ifeq ($(value FIRMWARE),10_sokkon)
+override SIMULATOR_FIRMWARE := 10_sokkon
+else ifeq ($(value FIRMWARE),99_stopwatch)
+override SIMULATOR_FIRMWARE := 99_stopwatch
+else
+override SIMULATOR_FIRMWARE := unsupported
+endif
 
 .PHONY: help build build-all test simulator-build simulator simulator-serve simulator-test companion companion-pair companion-once companion-test clean device-info backup flash monitor
 
 help: ## Show the available commands
-	@awk 'BEGIN {FS = ":.*## "; printf "Usage: make <target> [ENV=name] [PORT=/dev/cu.usbmodem...] [ARGS=\"...\"]\n\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-18s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@awk 'BEGIN {FS = ":.*## "; printf "Usage: make <target> [ENV=name] [FIRMWARE=10_sokkon|99_stopwatch] [PORT=/dev/cu.usbmodem...] [ARGS=\"...\"]\n\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-18s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 build: ## Build default_envs (10_sokkon), or only ENV when supplied
 	@PIO_ENV="$(ENV)" ./scripts/build.sh
@@ -19,14 +30,14 @@ build-all: ## Build every firmware environment, then run native tests
 test: ## Run native unit tests
 	@pio test --environment native
 
-simulator-build: ## Compile the production SOKKON C++ as a native simulator
-	@./scripts/build-simulator.sh
+simulator-build: ## Compile selected production firmware as a native simulator
+	@./scripts/build-simulator.sh --firmware "$(SIMULATOR_FIRMWARE)"
 
-simulator: simulator-build ## Start the local SOKKON simulator and open a browser
-	@python3 -m simulator --open $(ARGS)
+simulator: simulator-build ## Start selected local simulator and open a browser
+	@python3 -m simulator --firmware "$(SIMULATOR_FIRMWARE)" --open $(ARGS)
 
-simulator-serve: simulator-build ## Start the local SOKKON simulator without opening a browser
-	@python3 -m simulator --no-open $(ARGS)
+simulator-serve: simulator-build ## Start selected local simulator without opening a browser
+	@python3 -m simulator --firmware "$(SIMULATOR_FIRMWARE)" --no-open $(ARGS)
 
 simulator-test: simulator-build ## Run native-runner, process-bridge, and HTTP/static-UI tests
 	@python3 -m unittest discover -s test_simulator -v

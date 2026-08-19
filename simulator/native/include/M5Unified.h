@@ -290,6 +290,28 @@ class RtcStub {
   }
 };
 
+struct ImuAxis3 {
+  float x = 0.0F;
+  float y = 0.0F;
+  float z = 0.0F;
+};
+
+struct ImuData {
+  ImuAxis3 accel;
+  ImuAxis3 gyro;
+};
+
+class ImuStub {
+ public:
+  bool isEnabled() const { return true; }
+  bool update() const { return true; }
+  ImuData getImuData() const {
+    const auto& state = sokkon_sim::runtime();
+    return {{state.imu_accel_x, state.imu_accel_y, state.imu_accel_z},
+            {state.imu_gyro_x, state.imu_gyro_y, state.imu_gyro_z}};
+  }
+};
+
 struct M5ConfigStub {
   uint32_t serial_baudrate = 115200;
   bool clear_display = true;
@@ -308,6 +330,7 @@ class M5UnifiedStub {
   PowerStub Power;
   SpeakerStub Speaker;
   RtcStub Rtc;
+  ImuStub Imu;
 
   M5ConfigStub config() const { return {}; }
   void begin(const M5ConfigStub&) {}

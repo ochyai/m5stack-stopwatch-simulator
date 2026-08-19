@@ -129,6 +129,9 @@ class NativeRunnerAcceptanceTest(unittest.TestCase):
       self.assertIn(production_label, frame_text)
     self.assertEqual(snapshot["screen"]["mode"], "NOW")
     self.assertFalse(snapshot["screen"]["focus_running"])
+    self.assertEqual(snapshot["firmware"]["shell_subtitle"], "LOCAL FIRST INTERFACE")
+    self.assertEqual(snapshot["firmware"]["primary_aria"], "現在をマーク")
+    self.assertTrue(snapshot["firmware"]["host_controls"])
 
   def test_mark_ok_runs_event_ack_result_and_updates_production_ui(self) -> None:
     with NativeRunner() as runner:

@@ -906,6 +906,17 @@ kbd {
   padding: 22px 24px 24px;
 }
 
+.firmware-control-note {
+  margin: -2px 0 4px;
+  padding: 0 24px;
+  color: var(--muted);
+  font: 560 10px/1.55 ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+
+[data-host-control].is-firmware-disabled {
+  opacity: 0.34;
+}
+
 .switch-row,
 .field-group {
   grid-column: 1 / -1;

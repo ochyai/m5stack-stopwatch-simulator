@@ -5,7 +5,6 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
-#include <deque>
 #include <iomanip>
 #include <iostream>
 #include <limits>
@@ -42,33 +41,25 @@ void serialWrite(const char* data, size_t size) {
 
 }  // namespace sokkon_sim
 
-#if !defined(SIMULATOR_PRODUCTION_MAIN) && defined(SOKKON_PRODUCTION_MAIN)
-#define SIMULATOR_PRODUCTION_MAIN SOKKON_PRODUCTION_MAIN
-#endif
 #ifndef SIMULATOR_PRODUCTION_MAIN
-#define SIMULATOR_PRODUCTION_MAIN "../../firmware/apps/10_sokkon/main.cpp"
+#define SIMULATOR_PRODUCTION_MAIN "../../firmware/apps/99_stopwatch/main.cpp"
 #endif
 #include SIMULATOR_PRODUCTION_MAIN
 
-namespace sokkon_host {
+namespace stopwatch_host {
 
 using Clock = std::chrono::steady_clock;
 
 struct Scenario {
-  bool connected = true;
+  bool connected = false;
   std::string outcome = "OK";
   uint64_t latency_ms = 400;
-  std::string context = "CODEX";
-  std::string detail = "BUILDING SOKKON";
+  std::string context = "STOPWATCH";
+  std::string detail = "PRODUCTION C++";
   std::string host_mode = "NOW";
   int battery_percent = 84;
   bool charging = false;
   double time_scale = 1.0;
-};
-
-struct ScheduledLine {
-  uint64_t due_us = 0;
-  std::string line;
 };
 
 struct LogEntry {
@@ -78,12 +69,13 @@ struct LogEntry {
 };
 
 Scenario scenario;
-std::vector<ScheduledLine> scheduled_lines;
-std::vector<LogEntry> protocol_log;
+std::vector<LogEntry> event_log;
 size_t processed_device_lines = 0;
 uint64_t revision = 0;
 std::string command_error;
 Clock::time_point last_wall = Clock::now();
+long double wall_fraction_us = 0.0L;
+constexpr uint64_t kMaximumAdvanceMs = 600001;
 
 std::string jsonEscape(std::string_view value) {
   std::ostringstream output;
@@ -125,141 +117,40 @@ std::string jsonEscape(std::string_view value) {
 }
 
 void addLog(std::string kind, std::string message) {
-  protocol_log.push_back(
+  event_log.push_back(
       {static_cast<uint64_t>(millis()), std::move(kind), std::move(message)});
-  if (protocol_log.size() > 120) {
-    protocol_log.erase(protocol_log.begin(),
-                       protocol_log.begin() +
-                           static_cast<std::ptrdiff_t>(protocol_log.size() - 120));
+  if (event_log.size() > 120) {
+    event_log.erase(
+        event_log.begin(),
+        event_log.begin() +
+            static_cast<std::ptrdiff_t>(event_log.size() - 120));
   }
-}
-
-std::vector<std::string> splitPipe(const std::string& line) {
-  std::vector<std::string> fields;
-  size_t start = 0;
-  while (true) {
-    const size_t separator = line.find('|', start);
-    if (separator == std::string::npos) {
-      fields.push_back(line.substr(start));
-      return fields;
-    }
-    fields.push_back(line.substr(start, separator - start));
-    start = separator + 1;
-  }
-}
-
-std::string protocolSafe(std::string value) {
-  for (char& character : value) {
-    if (character == '|' || character == '\r' || character == '\n' ||
-        character == '\t' || character == '\0') {
-      character = ' ';
-    }
-  }
-  return value;
-}
-
-void queueHostInput(const std::string& line) {
-  auto& input = sokkon_sim::runtime().serial_rx;
-  for (const char character : line) input.push_back(character);
-  input.push_back('\n');
-  addLog("RX", line);
-}
-
-void scheduleHostResponse(const std::string& line, uint64_t delay_ms) {
-  scheduled_lines.push_back(
-      {sokkon_sim::micros64() + delay_ms * 1000ULL, line});
-  std::stable_sort(scheduled_lines.begin(), scheduled_lines.end(),
-                   [](const ScheduledLine& left, const ScheduledLine& right) {
-                     return left.due_us < right.due_us;
-                   });
 }
 
 void processDeviceOutput() {
   auto& lines = sokkon_sim::runtime().device_lines;
   while (processed_device_lines < lines.size()) {
-    const std::string line = lines[processed_device_lines++];
-    addLog("TX", line);
-    const std::vector<std::string> fields = splitPipe(line);
-    if (fields.size() < 4 || fields[0] != "EVENT") continue;
-
-    const std::string& session = fields[2];
-    const std::string& sequence = fields[3];
-    scheduleHostResponse("ACK|" + session + "|" + sequence + "|ACCEPTED",
-                         scenario.latency_ms);
-    if (scenario.outcome == "OK") {
-      scheduleHostResponse("RESULT|" + session + "|" + sequence + "|OK",
-                           scenario.latency_ms);
-    } else if (scenario.outcome == "ERROR") {
-      scheduleHostResponse(
-          "RESULT|" + session + "|" + sequence + "|ERROR|SIMULATED",
-          scenario.latency_ms);
-    }
+    addLog("SERIAL", lines[processed_device_lines++]);
   }
-}
-
-bool deliverScheduledLines() {
-  if (!scenario.connected) {
-    scheduled_lines.clear();
-    return false;
-  }
-  bool delivered = false;
-  const uint64_t now_us = sokkon_sim::micros64();
-  while (!scheduled_lines.empty() && scheduled_lines.front().due_us <= now_us) {
-    queueHostInput(scheduled_lines.front().line);
-    scheduled_lines.erase(scheduled_lines.begin());
-    delivered = true;
-  }
-  return delivered;
 }
 
 void runFirmwareLoop() {
+  const uint64_t before = sokkon_sim::micros64();
   loop();
+  if (sokkon_sim::micros64() == before) {
+    // A cooperative Arduino loop should yield with delay(), but force one
+    // virtual millisecond so an accidental busy loop cannot hang the host.
+    sokkon_sim::advanceMs(1);
+  }
   processDeviceOutput();
-}
-
-void consumeHostInput() {
-  if (sokkon_sim::runtime().serial_rx.empty()) return;
-  runFirmwareLoop();
-  processDeviceOutput();
-}
-
-void injectHostState() {
-  if (!scenario.connected) return;
-  queueHostInput("PING");
-  queueHostInput("STATE|12:34|" + scenario.host_mode + "|" +
-                 protocolSafe(scenario.context) + "|" +
-                 protocolSafe(scenario.detail));
-  consumeHostInput();
-}
-
-void settleAtCurrentTime();
-
-bool queueHeartbeatIfDue() {
-  if (!scenario.connected) return false;
-  const uint32_t now_ms = millis();
-  if (host_seen && now_ms - last_host_ms < 1000U) return false;
-  queueHostInput("PING");
-  queueHostInput("STATE|12:34|" + scenario.host_mode + "|" +
-                 protocolSafe(scenario.context) + "|" +
-                 protocolSafe(scenario.detail));
-  return true;
 }
 
 void advanceRuntimeTo(uint64_t target_us) {
   auto& state = sokkon_sim::runtime();
-  while (state.now_us < target_us) {
-    deliverScheduledLines();
-    queueHeartbeatIfDue();
-    runFirmwareLoop();
-  }
-
-  // A response can become due on the final 2 ms production-loop tick.  Give
-  // that serial input one loop before exposing the snapshot.
-  const bool delivered = deliverScheduledLines();
-  const bool heartbeat = queueHeartbeatIfDue();
-  if (delivered || heartbeat || !state.serial_rx.empty()) {
-    runFirmwareLoop();
-  }
+  const uint64_t previous_limit = state.advance_limit_us;
+  state.advance_limit_us = target_us;
+  while (state.now_us < target_us) runFirmwareLoop();
+  state.advance_limit_us = previous_limit;
 }
 
 void advanceRuntimeByMs(uint64_t milliseconds) {
@@ -273,25 +164,25 @@ void advanceRuntimeByMs(uint64_t milliseconds) {
   advanceRuntimeTo(state.now_us + std::min(delta_us, maximum_delta));
 }
 
-void maintainHostConnection() {
-  if (queueHeartbeatIfDue()) runFirmwareLoop();
-  settleAtCurrentTime();
-}
+void fastForwardIdleRuntimeByUs(uint64_t delta_us) {
+  auto& state = sokkon_sim::runtime();
+  const uint64_t maximum_delta =
+      std::numeric_limits<uint64_t>::max() - state.now_us;
+  const uint64_t bounded_delta = std::min(delta_us, maximum_delta);
+  if (bounded_delta == 0) return;
 
-void settleAtCurrentTime() {
-  for (int iteration = 0; iteration < 4; ++iteration) {
-    const bool delivered = deliverScheduledLines();
-    if (delivered || !sokkon_sim::runtime().serial_rx.empty()) {
-      consumeHostInput();
-      continue;
-    }
-    break;
-  }
-}
-
-void redrawAfterInput() {
-  advanceRuntimeByMs(101);
-  settleAtCurrentTime();
+  // There are no queued asynchronous events in this firmware. During an
+  // input-free wall-clock interval, the stopwatch is a function of now_us and
+  // the other time-driven branches only refresh sensors, drawing, and haptic
+  // expiry. Jump to the interval boundary and run the real production loop
+  // once there. This is equivalent at the observable boundary and avoids
+  // millions of 2 ms loop iterations at high time scales.
+  const uint64_t target_us = state.now_us + bounded_delta;
+  const uint64_t previous_limit = state.advance_limit_us;
+  state.advance_limit_us = target_us;
+  state.now_us = target_us;
+  runFirmwareLoop();
+  state.advance_limit_us = previous_limit;
 }
 
 void syncWallClock() {
@@ -301,41 +192,52 @@ void syncWallClock() {
           .count();
   last_wall = now;
   if (elapsed <= 0 || scenario.time_scale <= 0.0) return;
-  const long double scaled = static_cast<long double>(elapsed) *
-                             static_cast<long double>(scenario.time_scale);
+  const long double scaled =
+      static_cast<long double>(elapsed) *
+          static_cast<long double>(scenario.time_scale) +
+      wall_fraction_us;
   const uint64_t maximum = std::numeric_limits<uint64_t>::max() -
                            sokkon_sim::runtime().now_us;
   const uint64_t delta_us =
-      static_cast<uint64_t>(std::min<long double>(scaled, maximum));
-  advanceRuntimeTo(sokkon_sim::runtime().now_us + delta_us);
-  settleAtCurrentTime();
+      scaled >= static_cast<long double>(maximum)
+          ? maximum
+          : static_cast<uint64_t>(scaled);
+  wall_fraction_us = delta_us == maximum
+                         ? 0.0L
+                         : scaled - static_cast<long double>(delta_us);
+  fastForwardIdleRuntimeByUs(delta_us);
 }
 
 void performAction(const std::string& action) {
-  if (scenario.connected) injectHostState();
-
   auto& state = sokkon_sim::runtime();
   if (action == "MARK") {
     state.button_a = true;
     runFirmwareLoop();
+    addLog("INPUT", "A / START-PAUSE");
   } else if (action == "MODE") {
     state.button_b = true;
     runFirmwareLoop();
-    scenario.host_mode = kModes[mode_index];
-  } else if (action == "FOCUS" || action == "WAKE") {
+    addLog("INPUT", "B / RESET");
+  } else if (action == "FOCUS") {
     state.touch_x = M5.Display.width() / 2;
     state.touch_y = M5.Display.height() / 2;
     state.touch_pressed = true;
     runFirmwareLoop();
     state.touch_pressed = false;
     runFirmwareLoop();
+    addLog("INPUT", "TOUCH / START-PAUSE");
+  } else if (action == "WAKE") {
+    // This firmware has no sleep state. A wake request must not masquerade as
+    // a touch and unexpectedly toggle a running stopwatch.
+    addLog("INPUT", "WAKE / NO-OP");
+    return;
   } else {
     command_error = "unsupported action";
     return;
   }
-  processDeviceOutput();
-  settleAtCurrentTime();
-  redrawAfterInput();
+  // The production app redraws at 30 fps. Run its actual loop across one
+  // frame boundary instead of manufacturing a browser-side state update.
+  advanceRuntimeByMs(40);
 }
 
 bool parseBoolean(const std::string& value, bool* output) {
@@ -346,13 +248,6 @@ bool parseBoolean(const std::string& value, bool* output) {
   if (value == "0" || value == "false" || value == "FALSE") {
     *output = false;
     return true;
-  }
-  return false;
-}
-
-bool validMode(const std::string& value) {
-  for (const char* mode : kModes) {
-    if (value == mode) return true;
   }
   return false;
 }
@@ -371,13 +266,11 @@ void configure(const std::string& key, const std::string& value) {
   auto& state = sokkon_sim::runtime();
   try {
     if (key == "CONNECTED") {
-      if (!parseBoolean(value, &scenario.connected)) {
+      bool requested_connection = false;
+      if (!parseBoolean(value, &requested_connection)) {
         throw std::invalid_argument("CONNECTED must be boolean");
       }
-      if (!scenario.connected) {
-        scheduled_lines.clear();
-        state.serial_rx.clear();
-      }
+      scenario.connected = false;
     } else if (key == "OUTCOME") {
       if (value != "OK" && value != "ERROR" && value != "TIMEOUT") {
         throw std::invalid_argument("unsupported OUTCOME");
@@ -390,7 +283,6 @@ void configure(const std::string& key, const std::string& value) {
     } else if (key == "DETAIL") {
       scenario.detail = value;
     } else if (key == "HOST_MODE") {
-      if (!validMode(value)) throw std::invalid_argument("unsupported HOST_MODE");
       scenario.host_mode = value;
     } else if (key == "BATTERY_PERCENT") {
       scenario.battery_percent =
@@ -417,21 +309,14 @@ void configure(const std::string& key, const std::string& value) {
     return;
   }
 
-  if (scenario.connected) injectHostState();
   if (key == "BATTERY_PERCENT" || key == "CHARGING") {
-    advanceRuntimeByMs(1001);
-  } else {
-    advanceRuntimeByMs(101);
+    // Configuration is an observation change, not virtual elapsed time.
+    // Refresh the production canvas with the HAL values at the current clock.
+    battery_percent = scenario.battery_percent;
+    charging = scenario.charging;
+    drawUi(stopwatch.elapsedUs(nowMicros()));
   }
-  settleAtCurrentTime();
 }
-
-void advanceVirtualTime(uint64_t milliseconds) {
-  advanceRuntimeByMs(milliseconds);
-  settleAtCurrentTime();
-}
-
-std::string intentString(Intent intent) { return intentName(intent); }
 
 void appendDrawCommand(std::ostringstream& output,
                        const sokkon_sim::DrawCommand& command) {
@@ -440,19 +325,17 @@ void appendDrawCommand(std::ostringstream& output,
     output << ",\"color\":" << command.color;
   } else if (command.op == "drawCircle" || command.op == "fillCircle") {
     output << ",\"x\":" << command.x << ",\"y\":" << command.y
-           << ",\"r\":" << command.r << ",\"color\":"
-           << command.color;
+           << ",\"r\":" << command.r << ",\"color\":" << command.color;
   } else if (command.op == "drawArc") {
     output << ",\"x\":" << command.x << ",\"y\":" << command.y
            << ",\"outer_radius\":" << command.outer_radius
            << ",\"inner_radius\":" << command.inner_radius
-           << ",\"start\":" << command.start << ",\"end\":"
-           << command.end << ",\"color\":" << command.color;
+           << ",\"start\":" << command.start << ",\"end\":" << command.end
+           << ",\"color\":" << command.color;
   } else if (command.op == "fillRoundRect") {
     output << ",\"x\":" << command.x << ",\"y\":" << command.y
            << ",\"w\":" << command.w << ",\"h\":" << command.h
-           << ",\"r\":" << command.r << ",\"color\":"
-           << command.color;
+           << ",\"r\":" << command.r << ",\"color\":" << command.color;
   } else if (command.op == "drawString") {
     output << ",\"text\":" << jsonEscape(command.text)
            << ",\"x\":" << command.x << ",\"y\":" << command.y
@@ -460,41 +343,37 @@ void appendDrawCommand(std::ostringstream& output,
            << ",\"font_size\":" << command.font_size
            << ",\"text_size\":" << command.text_size
            << ",\"datum\":" << jsonEscape(command.datum)
-           << ",\"color\":" << command.color << ",\"background\":"
-           << command.background;
+           << ",\"color\":" << command.color
+           << ",\"background\":" << command.background;
   }
   output << '}';
 }
 
 std::string snapshotJson() {
-  const uint32_t now_ms = millis();
-  const uint64_t elapsed_ms = focus_timer.elapsedUs(nowMicros()) / 1000ULL;
-  char elapsed_text[24];
-  c152::formatElapsed(elapsed_ms * 1000ULL, elapsed_text,
-                      sizeof(elapsed_text));
-  const bool connected = hostConnected(now_ms);
-  const bool toast_visible =
-      toast_text[0] != '\0' && static_cast<int32_t>(toast_until_ms - now_ms) > 0;
   const auto& runtime = sokkon_sim::runtime();
+  const uint64_t elapsed_us = stopwatch.elapsedUs(nowMicros());
+  char elapsed_text[24];
+  c152::formatElapsed(elapsed_us, elapsed_text, sizeof(elapsed_text));
 
   std::ostringstream output;
   output << "{\"revision\":" << revision;
   if (!command_error.empty()) {
     output << ",\"command_error\":" << jsonEscape(command_error);
   }
-  output << ",\"firmware\":{\"id\":\"10_sokkon\""
-         << ",\"label\":\"SOKKON\""
-         << ",\"subtitle\":\"DIGITAL TWIN\""
-         << ",\"shell_subtitle\":\"LOCAL FIRST INTERFACE\""
-         << ",\"heading\":\"いまを、手で扱う。\""
-         << ",\"primary_label\":\"MARK\""
-         << ",\"secondary_label\":\"MODE\""
-         << ",\"touch_label\":\"FOCUS\""
-         << ",\"primary_aria\":\"現在をマーク\""
-         << ",\"secondary_aria\":\"モードを切り替え\""
-         << ",\"touch_aria\":\"フォーカスタイマーを開始または一時停止\""
-         << ",\"state_semantics\":\"sokkon\""
-         << ",\"host_controls\":true}";
+  output << ",\"firmware\":{\"id\":\"99_stopwatch\""
+         << ",\"label\":\"STOPWATCH\""
+         << ",\"subtitle\":\"PRODUCTION C++\""
+         << ",\"shell_subtitle\":\"NATIVE FIRMWARE\""
+         << ",\"heading\":\"時間を、そのまま測る。\""
+         << ",\"primary_label\":\"START / PAUSE\""
+         << ",\"secondary_label\":\"RESET\""
+         << ",\"touch_label\":\"START / PAUSE\""
+         << ",\"primary_aria\":\"ストップウォッチを開始または一時停止\""
+         << ",\"secondary_aria\":\"ストップウォッチをリセット\""
+         << ",\"touch_aria\":\"ストップウォッチを開始または一時停止\""
+         << ",\"state_semantics\":\"stopwatch\""
+         << ",\"host_controls\":false}";
+
   output << ",\"frame\":{\"width\":466,\"height\":466,\"brightness\":"
          << runtime.brightness << ",\"commands\":[";
   for (size_t index = 0; index < runtime.published_commands.size(); ++index) {
@@ -503,61 +382,44 @@ std::string snapshotJson() {
   }
   output << "]}";
 
-  output << ",\"screen\":{\"connected\":"
-         << (connected ? "true" : "false") << ",\"status\":"
-         << jsonEscape(connected ? "USB" : "LOCAL")
+  output << ",\"screen\":{\"connected\":false,\"status\":\"NATIVE\""
          << ",\"battery_percent\":" << battery_percent
          << ",\"charging\":" << (charging ? "true" : "false")
          << ",\"brightness\":" << runtime.brightness
-         << ",\"sleeping\":" << (display_sleeping ? "true" : "false")
-         << ",\"time\":" << jsonEscape(connected ? host_time : rtc_text)
-         << ",\"mode\":" << jsonEscape(kModes[mode_index])
-         << ",\"context\":"
-         << jsonEscape(connected ? context_text : "MAC NOT CONNECTED")
-         << ",\"detail\":"
-         << jsonEscape(connected ? detail_text : "USB-C TO BEGIN")
+         << ",\"sleeping\":false,\"time\":" << jsonEscape(rtc_text)
+         << ",\"mode\":\"STOPWATCH\""
+         << ",\"context\":\"99 / STOPWATCH\""
+         << ",\"detail\":\"COMPILED PRODUCTION C++\""
          << ",\"focus_running\":"
-         << (focus_timer.isRunning() ? "true" : "false")
-         << ",\"elapsed_ms\":" << elapsed_ms
+         << (stopwatch.isRunning() ? "true" : "false")
+         << ",\"elapsed_ms\":" << elapsed_us / 1000ULL
          << ",\"elapsed_text\":" << jsonEscape(elapsed_text)
-         << ",\"marks\":" << mark_count << ",\"toast\":"
-         << jsonEscape(toast_visible ? toast_text : "") << '}';
+         << ",\"marks\":0,\"toast\":\"\"}";
 
   output << ",\"scenario\":{\"connected\":"
-         << (scenario.connected ? "true" : "false") << ",\"outcome\":"
-         << jsonEscape(scenario.outcome) << ",\"latency_ms\":"
-         << scenario.latency_ms << ",\"context\":"
-         << jsonEscape(scenario.context) << ",\"detail\":"
-         << jsonEscape(scenario.detail) << ",\"host_mode\":"
-         << jsonEscape(scenario.host_mode) << ",\"battery_percent\":"
-         << scenario.battery_percent << ",\"charging\":"
-         << (scenario.charging ? "true" : "false")
+         << (scenario.connected ? "true" : "false")
+         << ",\"outcome\":" << jsonEscape(scenario.outcome)
+         << ",\"latency_ms\":" << scenario.latency_ms
+         << ",\"context\":" << jsonEscape(scenario.context)
+         << ",\"detail\":" << jsonEscape(scenario.detail)
+         << ",\"host_mode\":" << jsonEscape(scenario.host_mode)
+         << ",\"battery_percent\":" << scenario.battery_percent
+         << ",\"charging\":" << (scenario.charging ? "true" : "false")
          << ",\"time_scale\":" << scenario.time_scale << '}';
 
-  output << ",\"pending\":[";
-  bool first_pending = true;
-  for (const PendingEvent& pending : pending_events) {
-    if (!pending.active) continue;
-    if (!first_pending) output << ',';
-    first_pending = false;
-    output << "{\"sequence\":" << pending.sequence << ",\"intent\":"
-           << jsonEscape(intentString(pending.intent)) << ",\"accepted\":"
-           << (pending.accepted ? "true" : "false") << '}';
-  }
-  output << ']';
-
+  output << ",\"pending\":[]";
   output << ",\"haptic\":{\"active\":"
          << (runtime.vibration != 0 ? "true" : "false")
          << ",\"intensity\":" << static_cast<int>(runtime.last_vibration)
          << ",\"pulses\":" << runtime.haptic_pulses
          << ",\"label\":"
-         << jsonEscape(runtime.haptic_pulses == 0 ? "IDLE" : "VIBRATION")
+         << jsonEscape(runtime.vibration == 0 ? "IDLE" : "VIBRATION")
          << '}';
 
   output << ",\"log\":[";
-  for (size_t index = 0; index < protocol_log.size(); ++index) {
+  for (size_t index = 0; index < event_log.size(); ++index) {
     if (index != 0) output << ',';
-    const LogEntry& entry = protocol_log[index];
+    const LogEntry& entry = event_log[index];
     output << "{\"time\":" << entry.at_ms << ",\"kind\":"
            << jsonEscape(entry.kind) << ",\"message\":"
            << jsonEscape(entry.message) << '}';
@@ -572,24 +434,20 @@ void initialize() {
   state.charging = scenario.charging;
   setup();
   processDeviceOutput();
-  injectHostState();
-  advanceRuntimeByMs(101);
-  settleAtCurrentTime();
+  advanceRuntimeByMs(40);
   last_wall = Clock::now();
 }
 
 void handleCommand(const std::string& line) {
   command_error.clear();
   syncWallClock();
-  maintainHostConnection();
   if (line == "SNAPSHOT") {
-    settleAtCurrentTime();
+    // Wall-clock synchronization already ran the production loop.
   } else if (line.rfind("ACTION\t", 0) == 0) {
     performAction(line.substr(7));
   } else if (line.rfind("ADVANCE\t", 0) == 0) {
     try {
-      advanceVirtualTime(parseUnsigned(line.substr(8), 7ULL * 24ULL * 60ULL *
-                                                           60ULL * 1000ULL));
+      advanceRuntimeByMs(parseUnsigned(line.substr(8), kMaximumAdvanceMs));
     } catch (const std::exception& error) {
       command_error = error.what();
     }
@@ -608,15 +466,15 @@ void handleCommand(const std::string& line) {
   last_wall = Clock::now();
 }
 
-}  // namespace sokkon_host
+}  // namespace stopwatch_host
 
 int main() {
   std::ios::sync_with_stdio(false);
-  sokkon_host::initialize();
+  stopwatch_host::initialize();
   std::string line;
   while (std::getline(std::cin, line)) {
     if (!line.empty() && line.back() == '\r') line.pop_back();
-    sokkon_host::handleCommand(line);
+    stopwatch_host::handleCommand(line);
   }
   return 0;
 }

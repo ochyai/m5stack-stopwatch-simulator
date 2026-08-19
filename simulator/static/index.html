@@ -13,11 +13,11 @@
     <a class="skip-link" href="#scenario-controls">シナリオ設定へ移動</a>
 
     <header class="topbar">
-      <div class="brand" aria-label="SOKKON simulator">
+      <div id="simulator-brand" class="brand" aria-label="SOKKON simulator">
         <span class="brand-mark" aria-hidden="true"></span>
-        <span class="brand-word">SOKKON</span>
+        <span id="brand-word" class="brand-word">SOKKON</span>
         <span class="brand-divider" aria-hidden="true"></span>
-        <span class="brand-subtitle">DIGITAL TWIN</span>
+        <span id="brand-subtitle" class="brand-subtitle">DIGITAL TWIN</span>
       </div>
       <div class="api-state" data-testid="api-status" aria-live="polite">
         <span class="api-dot" aria-hidden="true"></span>
@@ -55,7 +55,7 @@
                 data-testid="mark-button"
               >
                 <span class="button-cap" aria-hidden="true"></span>
-                <span class="button-callout"><kbd>A</kbd><strong>MARK</strong></span>
+                <span class="button-callout"><kbd>A</kbd><strong id="primary-action-label">MARK</strong></span>
               </button>
 
               <button
@@ -67,7 +67,7 @@
                 data-testid="mode-button"
               >
                 <span class="button-cap" aria-hidden="true"></span>
-                <span class="button-callout"><kbd>B</kbd><strong>MODE</strong></span>
+                <span class="button-callout"><kbd>B</kbd><strong id="secondary-action-label">MODE</strong></span>
               </button>
 
               <div
@@ -86,7 +86,7 @@
                   data-testid="device-canvas"
                 ></canvas>
 
-                <div id="screen-content" class="screen-content sr-only" aria-live="polite">
+                <div id="screen-content" class="screen-content sr-only" aria-hidden="true">
                   <div class="screen-status" data-testid="screen-status">
                     <span class="connection-symbol" aria-hidden="true"></span>
                     <span id="screen-connection">LOCAL</span>
@@ -117,6 +117,8 @@
                   <div id="mark-count" class="mark-count" data-testid="mark-count">MARKS 0</div>
                 </div>
 
+                <p id="device-accessibility-summary" class="sr-only"></p>
+
                 <button
                   id="focus-button"
                   class="touch-zone"
@@ -124,7 +126,7 @@
                   aria-label="中央タッチ: フォーカスタイマーを開始または一時停止"
                   aria-keyshortcuts="Space"
                   data-testid="focus-button"
-                ><span>TOUCH</span></button>
+                ><span id="touch-action-label">TOUCH</span></button>
 
                 <div id="screen-toast" class="screen-toast sr-only" role="status" aria-live="polite" hidden data-testid="screen-toast">
                   MARK SENT
@@ -141,17 +143,17 @@
               </div>
 
               <div class="shell-label" aria-hidden="true">
-                <span>SOKKON</span>
-                <small>LOCAL FIRST INTERFACE</small>
+                <span id="shell-label">SOKKON</span>
+                <small id="shell-subtitle">LOCAL FIRST INTERFACE</small>
               </div>
             </div>
           </div>
         </div>
 
         <div class="keyboard-guide" aria-label="Keyboard shortcuts">
-          <span><kbd>A</kbd> MARK</span>
-          <span><kbd>B</kbd> MODE</span>
-          <span><kbd>SPACE</kbd> FOCUS</span>
+          <span><kbd>A</kbd> <span id="keyboard-primary">MARK</span></span>
+          <span><kbd>B</kbd> <span id="keyboard-secondary">MODE</span></span>
+          <span><kbd>SPACE</kbd> <span id="keyboard-touch">FOCUS</span></span>
         </div>
       </section>
 
@@ -159,14 +161,16 @@
         <section id="scenario-controls" class="panel scenario-panel" aria-labelledby="scenario-heading">
           <div class="panel-heading">
             <div>
-              <p class="panel-kicker">HOST CONDITIONS</p>
+              <p id="scenario-kicker" class="panel-kicker">HOST CONDITIONS</p>
               <h2 id="scenario-heading">Scenario</h2>
             </div>
             <button id="reset-button" class="quiet-button" type="button" data-testid="reset-button">RESET</button>
           </div>
 
+          <p id="firmware-control-note" class="firmware-control-note" hidden></p>
+
           <div class="scenario-grid">
-            <label class="switch-row" for="connected-input">
+            <label class="switch-row" for="connected-input" data-host-control>
               <span>
                 <strong>Mac connection</strong>
                 <small>USB host heartbeat</small>
@@ -175,7 +179,7 @@
               <span class="switch" aria-hidden="true"></span>
             </label>
 
-            <div class="field-group">
+            <div class="field-group" data-host-control>
               <p id="outcome-label" class="field-label">Result outcome</p>
               <div class="segmented" role="radiogroup" aria-labelledby="outcome-label" data-testid="outcome-control">
                 <input id="outcome-ok" type="radio" name="outcome" value="OK" data-scenario="outcome">
@@ -187,7 +191,7 @@
               </div>
             </div>
 
-            <div class="field-group range-field">
+            <div class="field-group range-field" data-host-control>
               <div class="label-line">
                 <label for="latency-input">Host latency</label>
                 <output id="latency-output" for="latency-input">400 ms</output>
@@ -206,7 +210,7 @@
             </div>
 
             <div class="field-group two-up">
-              <label for="mode-input">
+              <label for="mode-input" data-host-control>
                 <span>Host mode</span>
                 <select id="mode-input" data-scenario="host_mode" data-testid="mode-input">
                   <option>NOW</option>
@@ -232,12 +236,12 @@
               <span class="switch" aria-hidden="true"></span>
             </label>
 
-            <div class="field-group">
+            <div class="field-group" data-host-control>
               <label for="context-input">Frontmost app / context</label>
               <input id="context-input" type="text" maxlength="39" value="CODEX" placeholder="CODEX" data-scenario="context" data-testid="context-input">
             </div>
 
-            <div class="field-group">
+            <div class="field-group" data-host-control>
               <label for="detail-input">Detail</label>
               <input id="detail-input" type="text" maxlength="63" value="BUILDING SOKKON" placeholder="BUILDING SOKKON" data-scenario="detail" data-testid="detail-input">
             </div>
