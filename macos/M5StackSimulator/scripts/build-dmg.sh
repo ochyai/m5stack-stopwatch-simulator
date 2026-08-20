@@ -5,18 +5,23 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 package_root="$(cd "${script_dir}/.." && pwd)"
 app_path="${package_root}/dist/M5Stack Simulator.app"
 output_root="${package_root}/dist"
+developer_id=""
 
 usage() {
   cat <<'USAGE'
 usage: build-dmg.sh [options]
 
 Package an existing local M5Stack Simulator.app into a versioned DMG.
-This script does not sign, notarize, upload, or modify the source app.
+This script does not notarize, upload, or modify the source app.
 
 Options:
-  --app PATH          App bundle to package
-  --output DIRECTORY  DMG destination directory
-  -h, --help          Show this help
+  --app PATH                 App bundle to package
+  --output DIRECTORY         DMG destination directory
+  --developer-id <identity>  Sign the disk image with a Developer ID identity.
+                             Gatekeeper reads the image's own signature when a
+                             download is opened, so a distributed DMG needs one
+                             even though the app inside is already signed.
+  -h, --help                 Show this help
 USAGE
 }
 
@@ -30,6 +35,11 @@ while [[ $# -gt 0 ]]; do
     --output)
       [[ $# -ge 2 ]] || { usage >&2; exit 2; }
       output_root="$2"
+      shift 2
+      ;;
+    --developer-id)
+      [[ $# -ge 2 ]] || { echo "--developer-id needs an identity" >&2; exit 2; }
+      developer_id="$2"
       shift 2
       ;;
     -h|--help)
@@ -124,6 +134,12 @@ hdiutil imageinfo "${temporary_dmg}" >/dev/null
 # in the output directory remain untouched.
 rm -f "${dmg_path}" "${checksum_path}"
 mv "${temporary_dmg}" "${dmg_path}"
+
+if [[ -n "${developer_id}" ]]; then
+  codesign --force --timestamp --sign "${developer_id}" "${dmg_path}"
+  codesign --verify --strict --verbose=2 "${dmg_path}"
+fi
+
 (
   cd "${output_root}"
   shasum -a 256 "$(basename "${dmg_path}")" >"$(basename "${checksum_path}")"

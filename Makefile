@@ -82,12 +82,12 @@ macos-dmg: macos-app ## Package the local app as a versioned DMG with SHA-256
 macos-release: ## Build a Developer ID signed app and DMG (IDENTITY="Developer ID Application: ...")
 	@[[ -n "$(IDENTITY)" ]] || { echo 'usage: make macos-release IDENTITY="Developer ID Application: NAME (TEAMID)"' >&2; exit 2; }
 	@./macos/M5StackSimulator/scripts/build-app.sh --developer-id "$(IDENTITY)"
-	@./macos/M5StackSimulator/scripts/build-dmg.sh
+	@./macos/M5StackSimulator/scripts/build-dmg.sh --developer-id "$(IDENTITY)"
 	@echo 'next: make macos-notarize PROFILE=<notarytool keychain profile>'
 
-macos-notarize: ## Notarize and staple the newest DMG (PROFILE=<notarytool keychain profile>)
+macos-notarize: ## Notarize the app and DMG, staple both (PROFILE=<notarytool keychain profile>)
 	@[[ -n "$(PROFILE)" ]] || { echo 'usage: make macos-notarize PROFILE=<notarytool keychain profile>' >&2; exit 2; }
-	@./macos/M5StackSimulator/scripts/notarize-dmg.sh --keychain-profile "$(PROFILE)"
+	@./macos/M5StackSimulator/scripts/notarize-release.sh --keychain-profile "$(PROFILE)"
 
 companion: ## Run the local-first macOS Sokkon USB companion (pass ARGS="...")
 	@python3 -m companion $(ARGS)

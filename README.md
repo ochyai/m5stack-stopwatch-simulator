@@ -124,6 +124,11 @@ make macos-release IDENTITY="Developer ID Application: NAME (TEAMID)"
 make macos-notarize PROFILE=m5stack-simulator
 ```
 
+`macos-notarize`はアプリを先に公証してstapleし、そのstaple済みアプリでDMGを作り直してから
+DMGを公証します。DMGに貼ったticketはドラッグして取り出したアプリには付いてこないので、この順序
+でないとオフライン初回起動でGatekeeperが止めます。最後に、ダウンロード相当（quarantine属性付き）
+での判定まで確認します。
+
 `make macos-dmg`だけで作ったDMGはad-hoc署名なので、他のMacではGatekeeperに止められます。仕組みと操作は [Mac Simulator](docs/SIMULATOR.md)、アプリの信頼境界と配布手順は [macOS app](macos/M5StackSimulator/README.md) を参照してください。
 
 ## できること
