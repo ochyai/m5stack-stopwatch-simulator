@@ -133,4 +133,9 @@ trap - EXIT
 
 echo "Built ${dmg_path}"
 echo "Checksum ${checksum_path}"
-echo "Distribution status: local/unsigned; Developer ID and notarization still required"
+# Report what the packaged app is actually signed with rather than assuming.
+if codesign -dv "${app_path}" 2>&1 | grep -q "Authority=Developer ID Application"; then
+  echo "Distribution status: Developer ID signed; notarize next with scripts/notarize-dmg.sh"
+else
+  echo "Distribution status: local/unsigned; Developer ID and notarization still required"
+fi

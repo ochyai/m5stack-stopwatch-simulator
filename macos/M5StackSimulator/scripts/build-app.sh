@@ -68,7 +68,7 @@ while [[ $# -gt 0 ]]; do
     --developer-id)
       [[ $# -ge 2 ]] || { echo "--developer-id needs an identity" >&2; exit 2; }
       developer_id="$2"
-      shift
+      shift 2
       ;;
     --adhoc-sign)
       adhoc_sign=1
