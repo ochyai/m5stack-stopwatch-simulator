@@ -84,11 +84,11 @@ class StaticSimulatorUITest(unittest.TestCase):
     decoded_pixels = zlib.decompress(compressed_pixels)
     self.assertGreaterEqual(len(decoded_pixels), width * height)
 
-  def test_javascript_renders_native_frame_commands_and_font_size(self) -> None:
-    javascript = (STATIC / "app.js").read_text(encoding="utf-8")
-    self.assertIn("frame?.commands", javascript)
-    self.assertIn("for (const command of commands)", javascript)
-    self.assertIn("renderFrame(snapshot.frame || {}, screen)", javascript)
+  def test_one_shared_module_interprets_native_frame_commands(self) -> None:
+    """The device drawing path must exist exactly once in the repository."""
+    renderer = (STATIC / "frame-renderer.js").read_text(encoding="utf-8")
+    self.assertIn("frame?.commands", renderer)
+    self.assertIn("for (const command of commands)", renderer)
     for operation in (
       "fillscreen",
       "drawcircle",
@@ -97,16 +97,31 @@ class StaticSimulatorUITest(unittest.TestCase):
       "fillroundrect",
       "drawstring",
     ):
-      self.assertIn(f'"{operation}"', javascript)
+      self.assertIn(f'"{operation}"', renderer)
 
-    font_start = javascript.index("function fontForCommand")
-    font_end = javascript.index("function applyTextDatum", font_start)
-    font_function = javascript[font_start:font_end]
+    font_start = renderer.index("export function fontForCommand")
+    font_end = renderer.index("export function applyTextDatum", font_start)
+    font_function = renderer[font_start:font_end]
     self.assertIn('["font_size", "size_px", "text_size"]', font_function)
     self.assertIn("fontSize", font_function)
-    self.assertIn("px -apple-system", font_function)
-    self.assertIn("context.font = fontForCommand(command, renderState)", javascript)
-    self.assertIn("context.fillText(text, x, y)", javascript)
+    self.assertIn("context.font = fontForCommand(command, renderState, typography)", renderer)
+    self.assertIn("context.fillText(text, x, y)", renderer)
+
+    javascript = (STATIC / "app.js").read_text(encoding="utf-8")
+    workbench = (
+      ROOT / "simulator" / "workbench" / "src" / "App.jsx"
+    ).read_text(encoding="utf-8")
+    self.assertIn('from "/static/frame-renderer.js"', javascript)
+    self.assertIn('from "../../static/frame-renderer.js"', workbench)
+    for consumer in (javascript, workbench):
+      # A second interpreter is what makes the two UIs disagree about a pixel.
+      self.assertNotIn("function commandField", consumer)
+      self.assertNotIn("function colorValue", consumer)
+      self.assertNotIn('"fillroundrect"', consumer)
+
+  def test_static_ui_binds_the_native_snapshot_to_its_controls(self) -> None:
+    javascript = (STATIC / "app.js").read_text(encoding="utf-8")
+    self.assertIn("renderFrame(snapshot.frame || {}, screen)", javascript)
     self.assertIn("function renderFirmware", javascript)
     self.assertIn("renderFirmware(snapshot.firmware || {})", javascript)
     for field in (
@@ -120,6 +135,8 @@ class StaticSimulatorUITest(unittest.TestCase):
     self.assertIn('control.disabled = !hostControls', javascript)
 
     html = (STATIC / "index.html").read_text(encoding="utf-8")
+    # The shared renderer is an ES module, so its importer must be one too.
+    self.assertIn('<script type="module" src="/static/app.js"></script>', html)
     self.assertIn('id="device-accessibility-summary"', html)
     self.assertNotIn('id="device-accessibility-summary" class="sr-only" aria-live', html)
     self.assertIn('id="screen-content" class="screen-content sr-only" aria-hidden="true"', html)

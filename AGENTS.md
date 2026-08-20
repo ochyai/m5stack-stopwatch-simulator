@@ -25,6 +25,11 @@ M5Stack StopWatch（C152）のハードウェアを、安全かつ再現可能�
 - Mac companionの通常起動はpersistent device bindingを必須とし、実機device IDやbinding fileをcommitしない。
 - Mac companionは任意shell commandを実行しない。外部アクションはconfigで名前を明示したmacOS Shortcutだけに限定する。CAPTUREのRESULT OKはMarkdown `fsync`を保証し、Shortcutはlauncher起動時点でprotocol RESULTを返す。workflowの後発結果はTerminal logで扱う。
 - Mac simulatorは`firmware/apps/10_sokkon/main.cpp`と`firmware/shared/board.cpp`そのものをホストC++コンパイラでビルドする。画面・入力・protocolの状態機械をPythonやJavaScriptへ複製しない。ファームウェアのUI、タイマー、protocolを変えたらnative simulatorとparity testも同時に確認する。
+- native runnerの共通部分（NDJSON、log ring、scenario、wall clock、コマンドループ）は`simulator/native/include/sim_host.hpp`に置く。runnerには1つの本番ファームウェア固有の意味論だけを書く。新しいfirmwareを足すときは`sim_host::Host`を継承し、`FirmwareIdentity`と`screen`ブロックだけを実装する。
+- 描画命令(`frame.commands`)の解釈は`simulator/static/frame-renderer.js`だけが行う。従来UI(`simulator/static/app.js`)とWorkbench(`simulator/workbench/src/App.jsx`)はこれをimportする。UI側に2つ目のcanvas解釈を書かない。font familyのような純粋な見た目の差はtypography optionで渡す。
+- 文字の寸法は推定しない。`simulator/native/include/font_metrics.hpp`は実機が使うM5GFXから計測した生成物で、手で編集しない。フォントを増減したら`make font-metrics`で再生成する。`textWidth`と`drawString`の幾何は`sim_text.hpp`（LovyanGFXの`text_width`/`draw_string`の移植）だけが持つ。
+- 文字位置はnative runnerが`layout`として発行する。UIはそのpen gridに従って1文字ずつ描く。ブラウザのフォント計測でレイアウトを決め直さない。
+- 画面の変更を伴う作業は、`scenarios/*.sim`のセッションで確認し、意図した変更なら`make golden-update`でゴールデンを更新して差分をレビューする。ゴールデンを無検査で上書きしない。
 - ビルド生成物、`.pio/`、工場 Flash バックアップ、秘密情報をコミットしない。
 - ファイル編集は既存のユーザー変更を保持し、依頼範囲外の整形・置換をしない。
 
@@ -57,7 +62,33 @@ make companion-test
 
 # 本番SOKKON C++をMac/CI向けHALでコンパイルし、simulatorを統合テスト
 make simulator-test
+
+# 共有描画レンダラー、transport、Sites packageのnodeテスト
+make workbench-test
 ```
+
+## 実機なしで画面を確かめる
+
+シミュレータは本番C++をそのまま動かし、文字寸法も実機のフォント計測を使う。したがって画面の判断はここでできる。
+
+```bash
+# セッションを再生し、report.jsonと1枚のcontact sheetを書き出す
+make session SCRIPT=scenarios/sokkon-face.sim
+
+# ブラウザ無しで、はみ出し・円外・重なり・遮蔽だけを報告させる
+make session-report SCRIPT=scenarios/sokkon-host-states.sim
+```
+
+出力は`.simulator/sessions/`（gitignore済み）。`contact-sheet.png`を実際に見ること。`report.json`のfindingsは幾何的事実で、`severity: error`（画面に出ない）と`notice`（人が判断する）に分かれる。
+
+セッションの時間は凍結されるので、同じスクリプトは常に同じフレームを出す。ブラウザで触った操作は`python3 -m simulator --record path.sim`でそのままスクリプトになる。
+
+画面の判断が要る変更では、次を守る。
+
+1. まず`scenarios/`に再現スクリプトを書く（無ければ足す）。
+2. `make session`で描画結果を見る。推測で直さない。
+3. 直したら再度セッションを見て、`make simulator-test`でゴールデン差分を確認する。
+4. 意図した変更なら`make golden-update`、意図しない差分ならコードを直す。
 
 実機書き込みは副作用がある。端末、環境名、シリアルポートを確認してから実行する。
 

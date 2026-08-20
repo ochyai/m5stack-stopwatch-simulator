@@ -32,6 +32,11 @@ def build_parser() -> argparse.ArgumentParser:
   parser.add_argument("--host", default=DEFAULT_HOST, help="bind host (default: 127.0.0.1)")
   parser.add_argument("--port", type=int, default=DEFAULT_PORT, help="bind port (default: 8765)")
   parser.add_argument(
+    "--record",
+    metavar="SCRIPT",
+    help="append every accepted action and scenario change to a replayable session script",
+  )
+  parser.add_argument(
     "--allow-remote",
     action="store_true",
     help="allow a non-loopback bind; exposes simulator controls to the network",
@@ -85,13 +90,23 @@ def main(argv: Sequence[str] | None = None) -> int:
   if args.allow_remote and not host_is_loopback(args.host):
     print("WARNING: simulator controls are exposed beyond this Mac", file=sys.stderr)
 
+  recorder = None
+  if args.record:
+    from .session import ScriptRecorder
+
+    recorder = ScriptRecorder(args.record)
+
   try:
     with NativeSimulatorBackendManager(firmware_id=args.firmware) as backend:
-      server = create_server(backend, host=args.host, port=args.port)
+      server = create_server(
+        backend, host=args.host, port=args.port, recorder=recorder
+      )
       try:
         bound_port = server.server_address[1]
         url = browser_url(args.host, bound_port)
         print(f"M5Stack simulator [{args.firmware}]: {url}", flush=True)
+        if recorder is not None:
+          print(f"recording session to {recorder.path}", flush=True)
         if args.open_browser:
           webbrowser.open(url)
         server.serve_forever(poll_interval=0.1)

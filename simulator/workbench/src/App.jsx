@@ -29,6 +29,14 @@ import {
   WarningCircle,
 } from "@phosphor-icons/react";
 import { simulatorClient } from "./simulatorClient.js";
+import {
+  DEVICE_SIZE,
+  clamp,
+  commandName,
+  renderFrame,
+  safeText,
+  screenOpacity,
+} from "../../static/frame-renderer.js";
 import { createNativeLogWatermark, latestOrderedEvents, nativeLogKeys, nativeLogsAfterWatermark } from "./timeline.js";
 
 const FALLBACK_FIRMWARES = [
@@ -89,181 +97,29 @@ const DEMO_SNAPSHOT = {
   ],
 };
 
+const WORKBENCH_TYPOGRAPHY = {
+  fontFamily: 'ui-rounded, -apple-system, BlinkMacSystemFont, sans-serif',
+  regularWeight: 600,
+  boldWeight: 750,
+};
+
 const FILTERS = ["All", "Build", "Boot", "Input", "Draw", "Haptic", "System"];
-
-function clamp(value, minimum, maximum) {
-  const numeric = Number(value);
-  return Math.min(maximum, Math.max(minimum, Number.isFinite(numeric) ? numeric : minimum));
-}
-
-function safeText(value, fallback = "") {
-  return value === null || value === undefined ? fallback : String(value);
-}
-
-function colorValue(value, fallback = "#ffffff") {
-  if (typeof value === "string") {
-    if (/^#[0-9a-f]{3,8}$/i.test(value)) return value;
-    const named = {
-      TFT_BLACK: "#000000",
-      TFT_WHITE: "#ffffff",
-      TFT_RED: "#ff453a",
-      TFT_GREEN: "#32d74b",
-      TFT_BLUE: "#0a84ff",
-      TFT_YELLOW: "#ffd60a",
-      TFT_CYAN: "#2ee8f2",
-      TFT_MAGENTA: "#ff5ce8",
-      TFT_ORANGE: "#ff9f0a",
-      TFT_DARKGREY: "#636366",
-      TFT_LIGHTGREY: "#d1d1d6",
-    };
-    if (named[value.toUpperCase()]) return named[value.toUpperCase()];
-    const numeric = Number(value);
-    return Number.isFinite(numeric) ? colorValue(numeric, fallback) : fallback;
-  }
-  if (!Number.isFinite(Number(value))) return fallback;
-  const numeric = Math.max(0, Math.trunc(Number(value)));
-  if (numeric <= 0xffff) {
-    const red = Math.round(((numeric >> 11) & 0x1f) * 255 / 31);
-    const green = Math.round(((numeric >> 5) & 0x3f) * 255 / 63);
-    const blue = Math.round((numeric & 0x1f) * 255 / 31);
-    return `rgb(${red}, ${green}, ${blue})`;
-  }
-  return `#${Math.min(numeric, 0xffffff).toString(16).padStart(6, "0")}`;
-}
-
-function commandName(command) {
-  return safeText(Array.isArray(command) ? command[0] : command?.op ?? command?.type ?? command?.command)
-    .replaceAll("_", "")
-    .replaceAll("-", "")
-    .toLowerCase();
-}
-
-function commandField(command, names, index, fallback) {
-  if (Array.isArray(command) && command[index + 1] !== undefined) return command[index + 1];
-  for (const name of names) if (command?.[name] !== undefined) return command[name];
-  if (Array.isArray(command?.args) && command.args[index] !== undefined) return command.args[index];
-  return fallback;
-}
-
-function applyTextDatum(context, datum) {
-  const normalized = safeText(datum, "middle_center").toLowerCase();
-  context.textAlign = normalized.includes("left") ? "left" : normalized.includes("right") ? "right" : "center";
-  context.textBaseline = normalized.includes("top") ? "top" : normalized.includes("bottom") ? "bottom" : "middle";
-}
-
-function roundedRectangle(context, x, y, width, height, radius) {
-  context.beginPath();
-  if (typeof context.roundRect === "function") {
-    context.roundRect(x, y, width, height, radius);
-  } else {
-    context.rect(x, y, width, height);
-  }
-}
 
 function FirmwareCanvas({ frame, screen, canvasRef, onPress }) {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const context = canvas.getContext("2d", { alpha: false });
-    const commands = Array.isArray(frame?.commands) ? frame.commands : [];
-    const width = Math.max(1, Number(frame?.width) || 466);
-    const height = Math.max(1, Number(frame?.height) || 466);
-    const renderState = { color: "#ffffff", background: "#000000", font: "Font2", datum: "middle_center" };
-
-    context.save();
-    context.setTransform(466 / width, 0, 0, 466 / height, 0, 0);
-    context.fillStyle = "#000000";
-    context.fillRect(0, 0, width, height);
-    context.lineJoin = "round";
-
-    for (const command of commands) {
-      const name = commandName(command);
-      if (name === "settextcolor") {
-        renderState.color = colorValue(commandField(command, ["color", "foreground", "fg"], 0), renderState.color);
-        renderState.background = colorValue(commandField(command, ["background", "bg"], 1), renderState.background);
-        continue;
-      }
-      if (name === "setfont") {
-        renderState.font = commandField(command, ["font", "value"], 0, renderState.font);
-        continue;
-      }
-      if (name === "settextdatum") {
-        renderState.datum = commandField(command, ["datum", "value"], 0, renderState.datum);
-        continue;
-      }
-      if (name === "fillscreen") {
-        context.fillStyle = colorValue(commandField(command, ["color"], 0), "#000000");
-        context.fillRect(0, 0, width, height);
-        continue;
-      }
-      if (name === "drawcircle" || name === "fillcircle") {
-        const x = Number(commandField(command, ["x", "cx"], 0, 0));
-        const y = Number(commandField(command, ["y", "cy"], 1, 0));
-        const radius = Math.max(0, Number(commandField(command, ["r", "radius"], 2, 0)));
-        const color = colorValue(commandField(command, ["color"], 3), renderState.color);
-        context.beginPath();
-        context.arc(x, y, radius, 0, Math.PI * 2);
-        if (name === "fillcircle") {
-          context.fillStyle = color;
-          context.fill();
-        } else {
-          context.strokeStyle = color;
-          context.lineWidth = Math.max(1, Number(commandField(command, ["line_width"], 4, 1)));
-          context.stroke();
-        }
-        continue;
-      }
-      if (name === "drawarc") {
-        const x = Number(commandField(command, ["x", "cx"], 0, 0));
-        const y = Number(commandField(command, ["y", "cy"], 1, 0));
-        const outer = Number(commandField(command, ["outer_radius", "outer_r", "r1"], 2, 0));
-        const inner = Number(commandField(command, ["inner_radius", "inner_r", "r2"], 3, 0));
-        const start = Number(commandField(command, ["start", "start_angle"], 4, 0));
-        let end = Number(commandField(command, ["end", "end_angle"], 5, 0));
-        if (end < start) end += 360;
-        context.beginPath();
-        context.arc(x, y, (outer + inner) / 2, (start - 90) * Math.PI / 180, (end - 90) * Math.PI / 180);
-        context.strokeStyle = colorValue(commandField(command, ["color"], 6), renderState.color);
-        context.lineWidth = Math.max(1, Math.abs(outer - inner) + 1);
-        context.stroke();
-        continue;
-      }
-      if (name === "fillroundrect") {
-        const x = Number(commandField(command, ["x"], 0, 0));
-        const y = Number(commandField(command, ["y"], 1, 0));
-        const widthValue = Number(commandField(command, ["width", "w"], 2, 0));
-        const heightValue = Number(commandField(command, ["height", "h"], 3, 0));
-        roundedRectangle(context, x, y, widthValue, heightValue, Number(commandField(command, ["radius", "r"], 4, 0)));
-        context.fillStyle = colorValue(commandField(command, ["color"], 5), renderState.color);
-        context.fill();
-        continue;
-      }
-      if (name === "drawstring") {
-        const text = safeText(commandField(command, ["text", "value"], 0, ""));
-        const x = Number(commandField(command, ["x"], 1, 0));
-        const y = Number(commandField(command, ["y"], 2, 0));
-        const fontName = safeText(commandField(command, ["font"], -1, renderState.font));
-        const fontSize = Math.max(6, Number(commandField(command, ["font_size", "size_px"], -1, /24pt/i.test(fontName) ? 48 : 16)) || 16);
-        context.save();
-        context.font = `${/bold/i.test(fontName) ? 750 : 600} ${fontSize}px ui-rounded, -apple-system, BlinkMacSystemFont, sans-serif`;
-        applyTextDatum(context, commandField(command, ["datum", "text_datum"], -1, renderState.datum));
-        context.fillStyle = colorValue(commandField(command, ["color", "foreground"], 3), renderState.color);
-        context.fillText(text, x, y);
-        context.restore();
-      }
-    }
-    context.restore();
+    renderFrame(canvas.getContext("2d", { alpha: false }), frame, WORKBENCH_TYPOGRAPHY);
   }, [canvasRef, frame]);
 
-  const brightness = clamp(screen?.brightness ?? frame?.brightness ?? 100, 0, 100) / 100;
   return (
     <button className="screen-button" type="button" onClick={onPress} aria-label="Simulate center touch">
       <canvas
         ref={canvasRef}
         className="firmware-canvas"
-        width="466"
-        height="466"
-        style={{ opacity: screen?.sleeping ? 0 : brightness }}
+        width={DEVICE_SIZE}
+        height={DEVICE_SIZE}
+        style={{ opacity: screenOpacity(screen, frame) }}
         aria-hidden="true"
       />
       <span className="sr-only">Live C152 firmware display. Press to simulate touch.</span>

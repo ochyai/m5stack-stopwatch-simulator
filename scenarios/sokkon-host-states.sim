@@ -1,0 +1,24 @@
+# Everything the panel says about the Mac: connected, disconnected, and the
+# long strings the firmware has to fit into its own pixel budget.
+NOTE Host disconnected falls back to the local face.
+CONFIGURE connected false
+ADVANCE 6000
+SHOT disconnected
+
+CONFIGURE connected true
+CONFIGURE context CODEX
+CONFIGURE detail BUILDING SOKKON
+ADVANCE 1500
+SHOT connected
+
+NOTE A context far longer than the 300 px the firmware reserves for it.
+CONFIGURE context REFACTORING THE SIMULATOR HOST FRAMEWORK
+CONFIGURE detail REPLAYING SCRIPTED SESSIONS WITH DEVICE FONT METRICS
+ADVANCE 1500
+SHOT long-strings
+
+NOTE Low battery on charge, drawn on the one-second sensor tick.
+CONFIGURE battery_percent 7
+CONFIGURE charging true
+ADVANCE 1500
+SHOT low-battery

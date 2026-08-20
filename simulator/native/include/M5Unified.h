@@ -2,6 +2,7 @@
 
 #include "Arduino.h"
 #include "sim_runtime.hpp"
+#include "sim_text.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -24,20 +25,56 @@ constexpr uint32_t TFT_ORANGE = 0xFD20;
 constexpr uint32_t TFT_DARKGREY = 0x7BEF;
 constexpr uint32_t TFT_LIGHTGREY = 0xD69A;
 
-constexpr int middle_center = 0;
-constexpr int top_left = 1;
-constexpr int top_center = 2;
+// LovyanGFX textdatum_t values. The device derives its anchor arithmetic from
+// these bits (1:centre 2:right | 4:middle 8:bottom 16:baseline), so the HAL
+// must use the real numbers rather than symbolic placeholders.
+constexpr int top_left = 0;
+constexpr int top_center = 1;
+constexpr int top_right = 2;
+constexpr int middle_left = 4;
+constexpr int middle_center = 5;
+constexpr int middle_right = 6;
+constexpr int bottom_left = 8;
+constexpr int bottom_center = 9;
+constexpr int bottom_right = 10;
+constexpr int baseline_left = 16;
+constexpr int baseline_center = 17;
+constexpr int baseline_right = 18;
 
 struct SimFont {
   const char* name;
-  int size_px;
 };
 
 namespace fonts {
-inline constexpr SimFont Font2{"Font2", 16};
-inline constexpr SimFont FreeSansBold24pt7b{"FreeSansBold24pt7b", 48};
-inline constexpr SimFont FreeSansBold18pt7b{"FreeSansBold18pt7b", 36};
+inline constexpr SimFont Font2{"Font2"};
+inline constexpr SimFont FreeSansBold24pt7b{"FreeSansBold24pt7b"};
+inline constexpr SimFont FreeSansBold18pt7b{"FreeSansBold18pt7b"};
 }  // namespace fonts
+
+namespace sim_hal {
+
+inline const sim_font::Metrics& metricsFor(const SimFont* font) {
+  return sim_font::byName(font == nullptr ? nullptr : font->name);
+}
+
+inline const char* datumName(int datum) {
+  switch (datum) {
+    case top_left: return "top_left";
+    case top_center: return "top_center";
+    case top_right: return "top_right";
+    case middle_left: return "middle_left";
+    case middle_right: return "middle_right";
+    case bottom_left: return "bottom_left";
+    case bottom_center: return "bottom_center";
+    case bottom_right: return "bottom_right";
+    case baseline_left: return "baseline_left";
+    case baseline_center: return "baseline_center";
+    case baseline_right: return "baseline_right";
+    default: return "middle_center";
+  }
+}
+
+}  // namespace sim_hal
 
 class M5DisplayStub {
  public:
@@ -64,10 +101,11 @@ class M5DisplayStub {
     return text == nullptr ? 0 : textWidth(text);
   }
   int32_t textWidth(const char* text) const {
-    if (text == nullptr) return 0;
-    const int size = font_ == nullptr ? 16 : font_->size_px;
-    return static_cast<int32_t>(std::lround(std::strlen(text) * size *
-                                            text_size_ * 0.56));
+    return sim_text::textWidth(sim_hal::metricsFor(font_), text, text_size_);
+  }
+  int32_t fontHeight() const {
+    return sim_text::applyScale(sim_hal::metricsFor(font_).height,
+                                sim_text::fixedScale(text_size_));
   }
 
  private:
@@ -102,10 +140,11 @@ class M5Canvas {
   }
 
   int32_t textWidth(const char* text) const {
-    if (text == nullptr) return 0;
-    const int size = font_ == nullptr ? 16 : font_->size_px;
-    return static_cast<int32_t>(std::lround(std::strlen(text) * size *
-                                            text_size_ * 0.56));
+    return sim_text::textWidth(sim_hal::metricsFor(font_), text, text_size_);
+  }
+  int32_t fontHeight() const {
+    return sim_text::applyScale(sim_hal::metricsFor(font_).height,
+                                sim_text::fixedScale(text_size_));
   }
 
   void fillScreen(uint32_t color) {
@@ -165,19 +204,29 @@ class M5Canvas {
   }
 
   int32_t drawString(const char* text, int32_t x, int32_t y) {
+    const sim_font::Metrics& metrics = sim_hal::metricsFor(font_);
+    const sim_text::Layout placement =
+        sim_text::layout(metrics, text, x, y, datum_, text_size_, text_size_);
+
     sokkon_sim::DrawCommand command;
     command.op = "drawString";
     command.text = text == nullptr ? "" : text;
     command.x = x;
     command.y = y;
-    command.font = font_ == nullptr ? "Font2" : font_->name;
-    command.font_size = font_ == nullptr ? 16 : font_->size_px;
+    command.font = metrics.name;
+    command.font_size = metrics.height;
     command.text_size = text_size_;
-    command.datum = datumName(datum_);
+    command.datum = sim_hal::datumName(datum_);
     command.color = color_;
     command.background = background_;
+    command.text_left = placement.left;
+    command.text_top = placement.top;
+    command.text_baseline = placement.baseline;
+    command.text_pixel_width = placement.width;
+    command.text_box_height = placement.height;
+    command.pen_x = placement.pen;
     commands_.push_back(std::move(command));
-    return textWidth(text);
+    return placement.width;
   }
 
   void pushSprite(int32_t, int32_t) {
@@ -185,17 +234,6 @@ class M5Canvas {
   }
 
  private:
-  static const char* datumName(int datum) {
-    switch (datum) {
-      case top_left:
-        return "top_left";
-      case top_center:
-        return "top_center";
-      default:
-        return "middle_center";
-    }
-  }
-
   int32_t width_ = 0;
   int32_t height_ = 0;
   const SimFont* font_ = &fonts::Font2;

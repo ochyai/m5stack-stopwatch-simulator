@@ -45,6 +45,12 @@ jobs:
         if: matrix.environment != 'native'
         run: pio run --environment "${{ matrix.environment }}"
 
+      # The simulator's committed font measurements come from this package, so
+      # verify them on the one job that has it installed.
+      - name: Check device font metrics
+        if: matrix.environment == '10_sokkon'
+        run: python3 scripts/generate-font-metrics.py --check
+
       - name: Run native unit tests
         if: matrix.environment == 'native'
         run: pio test --environment native

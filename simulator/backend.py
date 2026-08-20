@@ -70,6 +70,9 @@ ADVANCE_COMMANDS = {
   "advance_10m": 600_001,
 }
 SUPPORTED_ACTIONS = frozenset((*ACTION_COMMANDS, *ADVANCE_COMMANDS, "reset"))
+# Scripted sessions may step virtual time freely inside one day; a runner still
+# enforces its own firmware-specific ceiling.
+MAX_ADVANCE_MS = 24 * 60 * 60 * 1000
 CONFIGURATION_KEYS = (
   "connected",
   "outcome",
@@ -297,11 +300,20 @@ def ensure_native_binary(
   *,
   sources: Iterable[Path] | None = None,
   repository_root: Path = REPOSITORY_ROOT,
+  firmware_id: str = DEFAULT_FIRMWARE_ID,
   build_arguments: Iterable[str] = (),
   timeout: float = 120.0,
 ) -> None:
-  """Build the native simulator when its executable is missing or stale."""
-  source_files = tuple(sources) if sources is not None else native_sources(repository_root)
+  """Build the native simulator when its executable is missing or stale.
+
+  ``firmware_id`` selects which inputs make the binary stale.  It is ignored
+  when an explicit ``sources`` tuple is supplied.
+  """
+  source_files = (
+    tuple(sources)
+    if sources is not None
+    else native_sources(repository_root, firmware_id=firmware_id)
+  )
   if binary_is_stale(binary, source_files):
     if not build_script.is_file():
       raise BackendBuildError(f"native build script not found: {build_script}")
@@ -427,6 +439,32 @@ class NativeSimulatorBackend:
     with self._lock:
       return self._exchange_locked(command)
 
+  def advance(self, milliseconds: object) -> dict[str, Any]:
+    """Advance virtual time by an exact number of milliseconds.
+
+    The HTTP API deliberately exposes only the fixed presets in
+    ``ADVANCE_COMMANDS``.  This entry point is for scripted sessions, which
+    need the same determinism at an arbitrary step.
+    """
+    if type(milliseconds) is not int or not 0 <= milliseconds <= MAX_ADVANCE_MS:
+      raise BackendInputError(
+        f"advance must be an integer from 0 to {MAX_ADVANCE_MS} milliseconds"
+      )
+    with self._lock:
+      return self._exchange_locked(f"ADVANCE\t{milliseconds}")
+
+  def freeze_time(self, frozen: object) -> dict[str, Any]:
+    """Stop or resume wall-clock time inside the native runner.
+
+    A UI wants a clock that ticks. A scripted session wants virtual time to
+    move only when the script says so, which is what makes a replay
+    reproducible on any machine.
+    """
+    if type(frozen) is not bool:
+      raise BackendInputError("freeze_time takes a boolean")
+    with self._lock:
+      return self._exchange_locked(f"FREEZE\t{'1' if frozen else '0'}")
+
   def configure(self, mapping: object) -> dict[str, Any]:
     configuration = normalize_configuration(mapping)
     with self._lock:
@@ -466,6 +504,7 @@ class NativeSimulatorBackend:
         self.build_script,
         sources=self.source_paths,
         repository_root=self.repository_root,
+        firmware_id=self.firmware_id,
         build_arguments=("--firmware", self.firmware_id),
         timeout=self.build_timeout,
       )
@@ -691,6 +730,14 @@ class NativeSimulatorBackendManager:
   def perform_action(self, action: object) -> dict[str, Any]:
     with self._lock:
       return self._backend_locked().perform_action(action)
+
+  def advance(self, milliseconds: object) -> dict[str, Any]:
+    with self._lock:
+      return self._backend_locked().advance(milliseconds)
+
+  def freeze_time(self, frozen: object) -> dict[str, Any]:
+    with self._lock:
+      return self._backend_locked().freeze_time(frozen)
 
   def configure(self, mapping: object) -> dict[str, Any]:
     with self._lock:

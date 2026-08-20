@@ -79,6 +79,16 @@ browser canvas ◀─ localhost HTTP API ◀─ Python process bridge┼─ prot
 したがって、ファームウェアの文字列、座標、色、制御フローを変えると、再ビルド後のsimulatorにも
 そのまま現れます。Python/JavaScriptにはSOKKONの状態機械を複製しません。
 
+描画命令を解釈する実装も1つだけです。`simulator/static/frame-renderer.js`が唯一のinterpreterで、
+従来UI(`simulator/static/app.js`)とWorkbench(`simulator/workbench/src/App.jsx`)がこれをimportします。
+これによって「どちらのUIで見たか」で画素が変わることがありません。font familyのような純粋な見た目
+だけをtypography optionで渡します。回帰は`make workbench-test`が記録用canvas contextで検証します。
+
+native側も同じ考え方です。NDJSONの組み立て、log ring、scenario、時間スケール、コマンドループは
+`simulator/native/include/sim_host.hpp`にあり、`simulator/native/runner.cpp`と
+`simulator/native/stopwatch_runner.cpp`は担当ファームウェア固有の意味論だけを持ちます。3本目の
+firmwareを足すときは`sim_host::Host`を継承し、`FirmwareIdentity`と`screen`ブロックを書けば足ります。
+
 ## 筐体のリファレンスとアセット
 
 筐体、円形ベゼル、上側の物理ボタン配置は、M5Stackの
@@ -168,6 +178,39 @@ native runnerは生成物なのでSOKKONは`.simulator/sokkon-native`、独立�
 `.simulator/stopwatch-native`へ置かれ、Gitには保存しません。選択した本番`main.cpp` / `board.cpp`、
 対応adapter、HAL、runtime、build scriptのどれかが新しくなれば、serverは起動前に再ビルドします。
 
+## 文字の寸法と、セッション再生
+
+`simulator/native/include/font_metrics.hpp`は、実機が使うM5GFXの`Font2`、`FreeSansBold18pt7b`、
+`FreeSansBold24pt7b`から**計測値だけ**を取り出した生成ファイルです（グリフのビットマップは複製して
+いません）。再生成は`make font-metrics`、CIは`10_sokkon`ビルドジョブで
+`scripts/generate-font-metrics.py --check`が陳腐化を検出します。
+
+`simulator/native/include/sim_text.hpp`はLovyanGFXの`text_width`と`draw_string`の幾何をそのまま
+移植したものです。固定小数点と切り捨ての位置まで同じにしてあるのは、`10_sokkon`の省略処理が
+`textWidth`の値そのもので分岐するからです。近似すると、simulatorだけが自分と整合して実機と
+食い違います。
+
+native runnerはdrawStringごとに`layout`（left / top / baseline / width / height / 1文字ごとのpen位置）
+を発行します。ブラウザはそのグリッドの上に字形を置くだけなので、折り返し・切れ・はみ出しは実機と
+同じ位置で起きます。字形そのものはホストのフォントで、実機のラスタライズとは異なります。
+
+セッションは`scenarios/*.sim`にある行指向のスクリプトです。
+
+```text
+CONFIGURE detail BUILDING SOKKON
+ACTION focus
+ADVANCE 65000
+SHOT focus-running
+```
+
+再生中は仮想時間が凍結され（protocolの`FREEZE`）、壁時計は進みません。したがって同じスクリプトは
+同じフレームを出し、`test_simulator/golden/`のゴールデンが成立します。`make session`は全SHOTを
+1枚の`contact-sheet.png`にまとめます。ブラウザ起動は描画より高価なので、セッション1回につき1起動です。
+
+`report.json`のfindingsは幾何的事実だけです。`error`は画面に出ないもの（フレームバッファ外、
+丸いパネルの可視円の外、文字同士の重なり、寸法未発行）、`notice`は後から描いた塗りに文字が隠れて
+いるもの。トーストのように意図的な遮蔽もここに出るので、判断は人が行います。
+
 ## 保証する範囲と実機確認が残る範囲
 
 simulator/CIが直接確認するもの:
@@ -175,12 +218,14 @@ simulator/CIが直接確認するもの:
 - 本番`main.cpp`と`board.cpp`がhost C++ compilerでコンパイルできること
 - 実際の`setup()`/`loop()`によるボタン、タッチ、timer、pending/result、protocol parserの挙動
 - 本番の描画呼び出し、文字列、座標、色がbrowser frameへ届くこと
+- 実機のフォント計測による文字幅と、それに依存する省略・折り返しの分岐
+- 各シナリオが描くフレームがゴールデンから動いていないこと
 - native process異常、timeout、巨大/不正入力をHTTP bridgeが安全に扱うこと
 - browser UIがC++ snapshot以外の画面状態を作らないこと
 
 実機が最終確認になるもの:
 
-- AMOLEDの実フォントラスタライズ、色味、残像、輝度
+- AMOLEDの実グリフ形状のラスタライズ、色味、残像、輝度（送り幅と配置は一致、字形は近似）
 - CST820Bの座標精度や指の当たり判定、物理ボタンの感触
 - 振動の強さ、モーター波形、スピーカー、電源・充電計測
 - USB CDCの実遅延、切断・再接続、ESP32-S3固有の起動とメモリ制約
@@ -192,5 +237,7 @@ simulatorは書き込み回数を大幅に減らし、日常の開発と回帰�
 
 1. UIやprotocolのロジックはproduction C++だけに書く。
 2. 新しく使うM5Unified/Arduino APIがあれば、HALはそのAPIの観測可能な効果だけを実装する。
-3. `make simulator-test`でcompiler/native/API/UI parityを確認する。
+3. `make simulator-test`でcompiler/native/API/UI parityとゴールデンフレームを、
+   `make workbench-test`で共有レンダラーとtransportを確認する。
+   画面が変わる変更は`make session SCRIPT=scenarios/<name>.sim`で実際に見る。
 4. 重要な触覚・電源・USB変更は実機でも確認し、結果を文書に残す。

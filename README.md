@@ -66,6 +66,15 @@ make simulator-serve ARGS="--port 9000"
 # native runner、process bridge、HTTP/static UIの回帰テスト
 make simulator-test
 
+# 共有描画レンダラー、transport、Sites packageのテスト
+make workbench-test
+
+# セッションを再生し、report.jsonと1枚のcontact sheetを書き出す
+make session SCRIPT=scenarios/sokkon-face.sim
+
+# ブラウザ無しで、画面に出ない描画だけを報告させる
+make session-report SCRIPT=scenarios/sokkon-host-states.sim
+
 # 初回だけ: 3ペインのFirmware Workbenchを準備
 make workbench-install
 
@@ -76,6 +85,25 @@ make workbench FIRMWARE=99_stopwatch
 make macos-app
 make macos-dmg
 ```
+
+## 実機なしで画面を確かめる
+
+文字の寸法は推定していません。`simulator/native/include/font_metrics.hpp`は実機が使うM5GFXパッケージから計測した生成物で、`textWidth`と`drawString`の幾何はLovyanGFXの実装をそのまま移植しています。だから`10_sokkon`が「300pxに収まるまで`...`で詰める」処理は、実機と同じ位置で切れます。native runnerは1文字ごとのpen位置も発行し、UIはそのグリッド上に描きます。
+
+`scenarios/*.sim`は、UIが送るのと同じコマンド（ボタン、仮想時間、シナリオ、SHOT）だけで書かれた再生スクリプトです。再生中は時間が凍結されるので、同じスクリプトはどのマシンでも同じフレームを出します。
+
+```bash
+make session SCRIPT=scenarios/sokkon-face.sim
+```
+
+`.simulator/sessions/`に、全SHOTを並べた`contact-sheet.png`と`report.json`が出ます。report内のfindingsは好みではなく幾何的事実です。
+
+- `severity: error` — 466×466の外、**丸い**AMOLEDの可視円の外、文字同士の重なり（画面に出ない）
+- `severity: notice` — 後から描いた塗りに文字が隠れている（トーストなど、人が判断する）
+
+ブラウザで触った操作は`python3 -m simulator --record path.sim`でそのまま再生スクリプトになります。`test_simulator/golden/`は各シナリオが描いたフレームを固定していて、意図しないレイアウト変更はテストで落ちます。意図した変更なら`make golden-update`で更新し、差分をレビューしてからコミットします。
+
+どのUIも描画命令を自前で解釈しません。native runnerが出した`frame.commands`は`simulator/static/frame-renderer.js`という1つのESモジュールだけが解釈し、従来UIとWorkbenchの両方がそれをimportします。同様にnative runner側の共通処理（NDJSON、シナリオ、時間スケール、コマンドループ）は`simulator/native/include/sim_host.hpp`にあり、各runnerは1つの本番ファームウェアの意味論だけを持ちます。
 
 Workbenchの既定URLは`http://127.0.0.1:4173/`、従来UI/APIは`http://127.0.0.1:8765/`です。`FIRMWARE=10_sokkon`と`FIRMWARE=99_stopwatch`は固定レジストリからだけ選べ、選択値からファイルパスやコンパイラ引数を組み立てません。外部サービスや実機は不要です。
 
@@ -155,7 +183,11 @@ pio device monitor -e 00_smoke --port /dev/cu.usbmodemXXXX
 firmware/apps/       機能別ファームウェア
 firmware/shared/     共通のボード初期化とロジック
 companion/           追加依存なしの macOS USB companion
-simulator/           本番C++を動かすnative HAL、process bridge、browser UI、Workbench
+simulator/native/    本番C++を動かすnative HALと、共有host framework(sim_host.hpp)上のrunner
+simulator/static/    従来UIと、両UIが共有する描画レンダラー(frame-renderer.js)
+simulator/workbench/ 3ペインのFirmware Workbench (React)
+scenarios/            再生可能なセッションスクリプト
+test_simulator/golden/ 各シナリオが描いたフレームの正本
 macos/               自己完結型M5Stack Simulator.appとDMGのbuild定義
 scripts/             ビルド、ポート検出、バックアップ、書き込み
 test/                PC 上で動かす単体テスト

@@ -1,0 +1,20 @@
+# The SOKKON face as it appears with a Mac attached: clock, mode, host context,
+# focus timer, and the marks counter.
+NOTE Connected host, default scenario.
+SHOT boot
+
+# The mode ring is the first thing a wrist glance reads.
+ACTION mode
+SHOT mode-build
+
+ACTION mode
+SHOT mode-read
+
+# A focus session running long enough to pass the minute boundary.
+ACTION focus
+ADVANCE 65000
+SHOT focus-running
+
+ACTION mark
+ADVANCE 500
+SHOT marked

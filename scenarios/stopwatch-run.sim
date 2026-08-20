@@ -1,0 +1,12 @@
+# The standalone stopwatch: start, cross a minute, pause, reset.
+SHOT idle
+
+ACTION mark
+ADVANCE 61500
+SHOT running
+
+ACTION mark
+SHOT paused
+
+ACTION mode
+SHOT reset

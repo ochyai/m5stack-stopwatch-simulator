@@ -28,6 +28,15 @@ struct DrawCommand {
   uint32_t background = 0;
   int32_t font_size = 16;
   float text_size = 1.0F;
+
+  // Text geometry measured with the device's own font metrics, so a viewer
+  // never has to guess where a glyph lands from a browser font.
+  int32_t text_left = 0;
+  int32_t text_top = 0;
+  int32_t text_baseline = 0;
+  int32_t text_pixel_width = 0;
+  int32_t text_box_height = 0;
+  std::vector<int32_t> pen_x;
 };
 
 struct Runtime {

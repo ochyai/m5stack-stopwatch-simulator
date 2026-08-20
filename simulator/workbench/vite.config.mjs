@@ -10,6 +10,11 @@ export default defineConfig({
   },
   server: {
     host: "127.0.0.1",
+    // src/App.jsx imports the shared draw-command renderer that the bundled
+    // static UI also serves, so dev mode must be allowed to read it.
+    fs: {
+      allow: [".", "../static"],
+    },
     allowedHosts: ["terminal.local"],
     proxy: {
       "/api": "http://127.0.0.1:8765",

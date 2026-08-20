@@ -25,3 +25,4 @@ backups/
 *.log
 __pycache__/
 *.py[cod]
+.gstack/

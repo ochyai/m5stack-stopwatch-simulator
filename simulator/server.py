@@ -129,8 +129,10 @@ class SimulatorHTTPServer(ThreadingHTTPServer):
     server_address: tuple[str, int],
     backend: Any,
     static_directory: Path,
+    recorder: Any = None,
   ) -> None:
     self.backend = backend
+    self.recorder = recorder
     self.backend_lock = threading.RLock()
     self.static_directory = static_directory.resolve()
     super().__init__(server_address, SimulatorRequestHandler)
@@ -183,6 +185,8 @@ class SimulatorRequestHandler(BaseHTTPRequestHandler):
           body = self._backend_json(
             lambda: self.server.backend.perform_action(action)
           )
+        # Record only what the backend accepted, so a recording always replays.
+        self._record(lambda recorder: recorder.record_action(action))
         self._send_json_bytes(HTTPStatus.OK, body)
         return
       if path == "/api/scenario":
@@ -191,6 +195,7 @@ class SimulatorRequestHandler(BaseHTTPRequestHandler):
         # alternate backends cannot accidentally widen the public API.
         normalize_configuration(payload)
         body = self._backend_json(lambda: self.server.backend.configure(payload))
+        self._record(lambda recorder: recorder.record_configuration(payload))
         self._send_json_bytes(HTTPStatus.OK, body)
         return
       if path == "/api/firmware":
@@ -517,6 +522,17 @@ class SimulatorRequestHandler(BaseHTTPRequestHandler):
       )
     return payload
 
+  def _record(self, callback: Callable[[Any], None]) -> None:
+    """Append to the session recording, never failing the request for it."""
+    recorder = getattr(self.server, "recorder", None)
+    if recorder is None:
+      return
+    try:
+      with self.server.backend_lock:
+        callback(recorder)
+    except OSError as error:
+      LOGGER.warning("session recording failed: %s", error)
+
   def _backend_json(self, callback: Callable[[], object]) -> bytes:
     with self.server.backend_lock:
       snapshot = callback()
@@ -691,6 +707,7 @@ def create_server(
   host: str = DEFAULT_HOST,
   port: int = DEFAULT_PORT,
   static_directory: str | Path = DEFAULT_STATIC_DIRECTORY,
+  recorder: Any = None,
 ) -> SimulatorHTTPServer:
   """Create a bound simulator HTTP server without entering its event loop."""
   if not isinstance(port, int) or isinstance(port, bool) or not 0 <= port <= 65_535:
@@ -700,4 +717,4 @@ def create_server(
   except socket.gaierror as error:
     raise ValueError(f"cannot resolve host {host!r}: {error}") from error
   server_class = IPv6SimulatorHTTPServer if address == socket.AF_INET6 else SimulatorHTTPServer
-  return server_class((host, port), backend, Path(static_directory))
+  return server_class((host, port), backend, Path(static_directory), recorder)
