@@ -71,11 +71,13 @@ command -v xcrun >/dev/null 2>&1 || {
 
 if [[ -z "${dmg_path}" ]]; then
   # Newest DMG in dist/, chosen without parsing ls output.
-  dmg_path="$(find "${dist_dir}" -maxdepth 1 -name '*.dmg' -print0 2>/dev/null \
-    | xargs -0 -r stat -f '%m %N' \
-    | sort -rn \
-    | head -1 \
-    | cut -d' ' -f2-)"
+  # `head` closing the pipe early would SIGPIPE `sort` and, under pipefail,
+  # abort the script. Sort into a variable and take the first line here.
+  newest="$(find "${dist_dir}" -maxdepth 1 -name '*.dmg' -print0 2>/dev/null \
+    | xargs -0 -r stat -f '%m %N' 2>/dev/null \
+    | sort -rn || true)"
+  dmg_path="${newest%%$'\n'*}"
+  dmg_path="${dmg_path#* }"
 fi
 
 [[ -n "${dmg_path}" && -f "${dmg_path}" ]] || {

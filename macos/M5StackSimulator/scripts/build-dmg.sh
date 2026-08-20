@@ -134,7 +134,11 @@ trap - EXIT
 echo "Built ${dmg_path}"
 echo "Checksum ${checksum_path}"
 # Report what the packaged app is actually signed with rather than assuming.
-if codesign -dv "${app_path}" 2>&1 | grep -q "Authority=Developer ID Application"; then
+# Read the description into a variable first: piping into `grep -q` lets grep
+# exit early, and the SIGPIPE that kills codesign would fail the whole pipeline
+# under `set -o pipefail`.
+signature_description="$(codesign -dv --verbose=4 "${app_path}" 2>&1 || true)"
+if [[ "${signature_description}" == *"Authority=Developer ID Application"* ]]; then
   echo "Distribution status: Developer ID signed; notarize next with scripts/notarize-dmg.sh"
 else
   echo "Distribution status: local/unsigned; Developer ID and notarization still required"
