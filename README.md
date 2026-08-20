@@ -51,6 +51,10 @@ MARKはMacがMarkdownを`fsync`できた後だけ強い確定振動を返しま�
 
 ## Macで先に動かす — compiler-driven simulator
 
+![SOKKONシミュレータ](docs/images/simulator-ui.png)
+
+本番`main.cpp`と`board.cpp`をMacのC++コンパイラでそのまま動かします。画面のどこを触ってもデバイス座標が本番の`loop()`へ渡るので、`10_sokkon`が「中心から半径145px以内だけをフォーカス操作として受ける」という判定もそのまま確かめられます。傾き（加速度）もシナリオから与えられます。
+
 実機へ書き込む前に、本番`main.cpp`と`board.cpp`をMacのC++コンパイラで直接動かせます。ブラウザは別実装のモックではなく、本番C++が出した466 × 466の描画命令と状態を表示します。既定のSOKKONに加え、別の本番コード`99_stopwatch`も同じHALとCanvas経路で実行できます。
 
 ```bash
@@ -96,6 +100,8 @@ make macos-dmg
 make session SCRIPT=scenarios/sokkon-face.sim
 ```
 
+![セッションのコンタクトシート](docs/images/session-contact-sheet.png)
+
 `.simulator/sessions/`に、全SHOTを並べた`contact-sheet.png`と`report.json`が出ます。report内のfindingsは好みではなく幾何的事実です。
 
 - `severity: error` — 466×466の外、**丸い**AMOLEDの可視円の外、文字同士の重なり（画面に出ない）
@@ -107,7 +113,18 @@ make session SCRIPT=scenarios/sokkon-face.sim
 
 Workbenchの既定URLは`http://127.0.0.1:4173/`、従来UI/APIは`http://127.0.0.1:8765/`です。`FIRMWARE=10_sokkon`と`FIRMWARE=99_stopwatch`は固定レジストリからだけ選べ、選択値からファイルパスやコンパイラ引数を組み立てません。外部サービスや実機は不要です。
 
-`M5Stack Simulator.app`はWorkbench、Swiftの型付きbridge、両方のnative runnerを自己完結で内包します。生成物は`macos/M5StackSimulator/dist/`です。現在のDMGはこのMac向けのad-hoc署名版で、一般公開にはリポジトリlicenseの決定、Developer ID署名、notarizationが別途必要です。仕組みと操作は [Mac Simulator](docs/SIMULATOR.md)、アプリの信頼境界と配布手順は [macOS app](macos/M5StackSimulator/README.md) を参照してください。
+`M5Stack Simulator.app`はWorkbench、Swiftの型付きbridge、両方のnative runnerを自己完結で内包します。生成物は`macos/M5StackSimulator/dist/`です。配布用に署名・公証する場合は次の順です。
+
+```bash
+# Developer ID Application 証明書で署名し、DMGを作る
+make macos-release IDENTITY="Developer ID Application: NAME (TEAMID)"
+
+# 一度だけ資格情報をキーチェーンに保存（このコマンドは自分で実行）
+#   xcrun notarytool store-credentials m5stack-simulator --apple-id ... --team-id ... --password ...
+make macos-notarize PROFILE=m5stack-simulator
+```
+
+`make macos-dmg`だけで作ったDMGはad-hoc署名なので、他のMacではGatekeeperに止められます。仕組みと操作は [Mac Simulator](docs/SIMULATOR.md)、アプリの信頼境界と配布手順は [macOS app](macos/M5StackSimulator/README.md) を参照してください。
 
 ## できること
 
@@ -199,4 +216,4 @@ platformio.ini       固定したビルド環境と依存ライブラリ
 
 ## ライセンス
 
-このリポジトリのライセンスは現時点で未設定です。`LICENSE` が追加されるまで、コードや文書の再配布・派生利用条件は確定していません。依存ライブラリと公式サンプルには、それぞれのライセンスが適用されます。
+MIT License（[LICENSE](LICENSE)）。依存ライブラリと、生成したフォント計測値の出典は [NOTICE.md](NOTICE.md) にまとめています。フォントのグリフビットマップはこのリポジトリに複製していません。

@@ -43,10 +43,10 @@ DEVICE_CENTER = DEVICE_SIZE / 2
 MAX_ADVANCE_MS = 24 * 60 * 60 * 1000
 MAX_STEPS = 2_000
 
-STEP_KINDS = ("action", "advance", "configure", "reset", "shot", "note")
+STEP_KINDS = ("action", "touch", "advance", "configure", "reset", "shot", "note")
 BOOLEAN_KEYS = ("connected", "charging")
 INTEGER_KEYS = ("latency_ms", "battery_percent")
-FLOAT_KEYS = ("time_scale",)
+FLOAT_KEYS = ("time_scale", "tilt_x", "tilt_y")
 
 
 class SessionError(ValueError):
@@ -65,6 +65,8 @@ class Step:
   def render(self) -> str:
     if self.kind == "configure":
       return f"CONFIGURE {self.argument} {_render_value(self.value)}"
+    if self.kind == "touch":
+      return f"TOUCH {self.value[0]} {self.value[1]}"
     if self.kind == "advance":
       return f"ADVANCE {self.value}"
     if self.kind == "reset":
@@ -125,7 +127,18 @@ def parse_script(text: str) -> tuple[Step, ...]:
     keyword = keyword.upper()
     remainder = remainder.strip()
 
-    if keyword == "ACTION":
+    if keyword == "TOUCH":
+      parts = remainder.split()
+      if len(parts) != 2:
+        raise SessionError(f"line {number}: TOUCH needs an x and a y in panel pixels")
+      try:
+        x, y = (int(part, 10) for part in parts)
+      except ValueError as error:
+        raise SessionError(f"line {number}: TOUCH coordinates must be whole numbers") from error
+      if not (0 <= x < DEVICE_SIZE and 0 <= y < DEVICE_SIZE):
+        raise SessionError(f"line {number}: TOUCH must land inside 0..{DEVICE_SIZE - 1}")
+      steps.append(Step("touch", value=(x, y), line=number))
+    elif keyword == "ACTION":
       action = remainder.lower()
       if action not in ACTION_COMMANDS:
         expected = ", ".join(sorted(ACTION_COMMANDS))
@@ -444,6 +457,8 @@ def run_session(backend: Any, steps: Sequence[Step], *, firmware_id: str) -> Ses
   for step in steps:
     if step.kind == "action":
       snapshot = backend.perform_action(step.argument)
+    elif step.kind == "touch":
+      snapshot = backend.touch(step.value[0], step.value[1])
     elif step.kind == "advance":
       snapshot = backend.advance(step.value)
     elif step.kind == "configure":
@@ -515,6 +530,9 @@ class ScriptRecorder:
   def _append(self, line: str) -> None:
     with self.path.open("a", encoding="utf-8") as handle:
       handle.write(line + "\n")
+
+  def record_touch(self, x: int, y: int) -> None:
+    self._append(f"TOUCH {x} {y}")
 
   def record_action(self, action: str) -> None:
     if action in ACTION_COMMANDS:

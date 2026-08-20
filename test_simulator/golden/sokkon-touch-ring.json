@@ -1,0 +1,1535 @@
+{
+  "firmware": "10_sokkon",
+  "shots": [
+    {
+      "commands": [
+        {
+          "color": 0,
+          "op": "fillScreen"
+        },
+        {
+          "color": 8484,
+          "op": "drawCircle",
+          "r": 230,
+          "x": 233,
+          "y": 233
+        },
+        {
+          "color": 2047,
+          "op": "drawCircle",
+          "r": 224,
+          "x": 233,
+          "y": 233
+        },
+        {
+          "background": 0,
+          "color": 2016,
+          "datum": "middle_center",
+          "font": "Font2",
+          "font_size": 16,
+          "layout": {
+            "baseline": 57,
+            "height": 16,
+            "left": 188,
+            "pen": [
+              188,
+              196,
+              204,
+              212,
+              218,
+              224,
+              232,
+              240,
+              248,
+              254,
+              262,
+              270
+            ],
+            "top": 44,
+            "width": 91
+          },
+          "op": "drawString",
+          "text": "USB  BAT 84%",
+          "text_size": 1,
+          "x": 233,
+          "y": 52
+        },
+        {
+          "background": 0,
+          "color": 65535,
+          "datum": "middle_center",
+          "font": "FreeSansBold24pt7b",
+          "font_size": 47,
+          "layout": {
+            "baseline": 110,
+            "height": 47,
+            "left": 175,
+            "pen": [
+              175,
+              201,
+              227,
+              239,
+              265
+            ],
+            "top": 75,
+            "width": 116
+          },
+          "op": "drawString",
+          "text": "12:34",
+          "text_size": 1,
+          "x": 233,
+          "y": 98
+        },
+        {
+          "background": 0,
+          "color": 2047,
+          "datum": "middle_center",
+          "font": "FreeSansBold18pt7b",
+          "font_size": 33,
+          "layout": {
+            "baseline": 157,
+            "height": 33,
+            "left": 190,
+            "pen": [
+              190,
+              216,
+              243
+            ],
+            "top": 132,
+            "width": 87
+          },
+          "op": "drawString",
+          "text": "NOW",
+          "text_size": 1,
+          "x": 233,
+          "y": 148
+        },
+        {
+          "background": 0,
+          "color": 54938,
+          "datum": "middle_center",
+          "font": "Font2",
+          "font_size": 16,
+          "layout": {
+            "baseline": 193,
+            "height": 16,
+            "left": 213,
+            "pen": [
+              213,
+              221,
+              229,
+              237,
+              245
+            ],
+            "top": 180,
+            "width": 40
+          },
+          "op": "drawString",
+          "text": "CODEX",
+          "text_size": 1,
+          "x": 233,
+          "y": 188
+        },
+        {
+          "background": 0,
+          "color": 31727,
+          "datum": "middle_center",
+          "font": "Font2",
+          "font_size": 16,
+          "layout": {
+            "baseline": 218,
+            "height": 16,
+            "left": 179,
+            "pen": [
+              179,
+              187,
+              195,
+              199,
+              206,
+              214,
+              218,
+              226,
+              234,
+              240,
+              248,
+              256,
+              264,
+              272,
+              280
+            ],
+            "top": 205,
+            "width": 109
+          },
+          "op": "drawString",
+          "text": "BUILDING SOKKON",
+          "text_size": 1,
+          "x": 233,
+          "y": 213
+        },
+        {
+          "background": 0,
+          "color": 54938,
+          "datum": "middle_center",
+          "font": "Font2",
+          "font_size": 16,
+          "layout": {
+            "baseline": 263,
+            "height": 16,
+            "left": 180,
+            "pen": [
+              180,
+              188,
+              196,
+              204,
+              212,
+              220,
+              226,
+              233,
+              239,
+              247,
+              255,
+              263,
+              271,
+              279
+            ],
+            "top": 250,
+            "width": 107
+          },
+          "op": "drawString",
+          "text": "FOCUS / PAUSED",
+          "text_size": 1,
+          "x": 233,
+          "y": 258
+        },
+        {
+          "background": 0,
+          "color": 65535,
+          "datum": "middle_center",
+          "font": "FreeSansBold18pt7b",
+          "font_size": 33,
+          "layout": {
+            "baseline": 310,
+            "height": 33,
+            "left": 144,
+            "pen": [
+              144,
+              163,
+              182,
+              191,
+              210,
+              229,
+              238,
+              257,
+              276,
+              285,
+              304
+            ],
+            "top": 285,
+            "width": 179
+          },
+          "op": "drawString",
+          "text": "00:00:00.00",
+          "text_size": 1,
+          "x": 233,
+          "y": 301
+        },
+        {
+          "color": 65504,
+          "op": "fillCircle",
+          "r": 8,
+          "x": 51,
+          "y": 350
+        },
+        {
+          "background": 0,
+          "color": 65504,
+          "datum": "middle_center",
+          "font": "Font2",
+          "font_size": 16,
+          "layout": {
+            "baseline": 355,
+            "height": 16,
+            "left": 72,
+            "pen": [
+              72,
+              82,
+              90,
+              98
+            ],
+            "top": 342,
+            "width": 34
+          },
+          "op": "drawString",
+          "text": "MARK",
+          "text_size": 1,
+          "x": 89,
+          "y": 350
+        },
+        {
+          "color": 31,
+          "op": "fillCircle",
+          "r": 8,
+          "x": 415,
+          "y": 350
+        },
+        {
+          "background": 0,
+          "color": 31,
+          "datum": "middle_center",
+          "font": "Font2",
+          "font_size": 16,
+          "layout": {
+            "baseline": 355,
+            "height": 16,
+            "left": 358,
+            "pen": [
+              358,
+              368,
+              376,
+              384
+            ],
+            "top": 342,
+            "width": 34
+          },
+          "op": "drawString",
+          "text": "MODE",
+          "text_size": 1,
+          "x": 375,
+          "y": 350
+        },
+        {
+          "background": 0,
+          "color": 54938,
+          "datum": "middle_center",
+          "font": "Font2",
+          "font_size": 16,
+          "layout": {
+            "baseline": 394,
+            "height": 16,
+            "left": 187,
+            "pen": [
+              187,
+              195,
+              203,
+              211,
+              219,
+              227,
+              233,
+              239,
+              247,
+              255,
+              263,
+              271
+            ],
+            "top": 381,
+            "width": 92
+          },
+          "op": "drawString",
+          "text": "TOUCH  FOCUS",
+          "text_size": 1,
+          "x": 233,
+          "y": 389
+        },
+        {
+          "background": 0,
+          "color": 31727,
+          "datum": "middle_center",
+          "font": "Font2",
+          "font_size": 16,
+          "layout": {
+            "baseline": 421,
+            "height": 16,
+            "left": 205,
+            "pen": [
+              205,
+              215,
+              223,
+              231,
+              239,
+              247,
+              253
+            ],
+            "top": 408,
+            "width": 56
+          },
+          "op": "drawString",
+          "text": "MARKS 0",
+          "text_size": 1,
+          "x": 233,
+          "y": 416
+        }
+      ],
+      "label": "idle",
+      "screen": {
+        "battery_percent": 84,
+        "brightness": 96,
+        "charging": false,
+        "connected": true,
+        "context": "CODEX",
+        "detail": "BUILDING SOKKON",
+        "elapsed_ms": 0,
+        "elapsed_text": "00:00:00.00",
+        "focus_running": false,
+        "marks": 0,
+        "mode": "NOW",
+        "sleeping": false,
+        "status": "USB",
+        "time": "12:34",
+        "toast": ""
+      }
+    },
+    {
+      "commands": [
+        {
+          "color": 0,
+          "op": "fillScreen"
+        },
+        {
+          "color": 8484,
+          "op": "drawCircle",
+          "r": 230,
+          "x": 233,
+          "y": 233
+        },
+        {
+          "color": 2047,
+          "op": "drawCircle",
+          "r": 224,
+          "x": 233,
+          "y": 233
+        },
+        {
+          "background": 0,
+          "color": 2016,
+          "datum": "middle_center",
+          "font": "Font2",
+          "font_size": 16,
+          "layout": {
+            "baseline": 57,
+            "height": 16,
+            "left": 188,
+            "pen": [
+              188,
+              196,
+              204,
+              212,
+              218,
+              224,
+              232,
+              240,
+              248,
+              254,
+              262,
+              270
+            ],
+            "top": 44,
+            "width": 91
+          },
+          "op": "drawString",
+          "text": "USB  BAT 84%",
+          "text_size": 1,
+          "x": 233,
+          "y": 52
+        },
+        {
+          "background": 0,
+          "color": 65535,
+          "datum": "middle_center",
+          "font": "FreeSansBold24pt7b",
+          "font_size": 47,
+          "layout": {
+            "baseline": 110,
+            "height": 47,
+            "left": 175,
+            "pen": [
+              175,
+              201,
+              227,
+              239,
+              265
+            ],
+            "top": 75,
+            "width": 116
+          },
+          "op": "drawString",
+          "text": "12:34",
+          "text_size": 1,
+          "x": 233,
+          "y": 98
+        },
+        {
+          "background": 0,
+          "color": 2047,
+          "datum": "middle_center",
+          "font": "FreeSansBold18pt7b",
+          "font_size": 33,
+          "layout": {
+            "baseline": 157,
+            "height": 33,
+            "left": 190,
+            "pen": [
+              190,
+              216,
+              243
+            ],
+            "top": 132,
+            "width": 87
+          },
+          "op": "drawString",
+          "text": "NOW",
+          "text_size": 1,
+          "x": 233,
+          "y": 148
+        },
+        {
+          "background": 0,
+          "color": 54938,
+          "datum": "middle_center",
+          "font": "Font2",
+          "font_size": 16,
+          "layout": {
+            "baseline": 193,
+            "height": 16,
+            "left": 213,
+            "pen": [
+              213,
+              221,
+              229,
+              237,
+              245
+            ],
+            "top": 180,
+            "width": 40
+          },
+          "op": "drawString",
+          "text": "CODEX",
+          "text_size": 1,
+          "x": 233,
+          "y": 188
+        },
+        {
+          "background": 0,
+          "color": 31727,
+          "datum": "middle_center",
+          "font": "Font2",
+          "font_size": 16,
+          "layout": {
+            "baseline": 218,
+            "height": 16,
+            "left": 179,
+            "pen": [
+              179,
+              187,
+              195,
+              199,
+              206,
+              214,
+              218,
+              226,
+              234,
+              240,
+              248,
+              256,
+              264,
+              272,
+              280
+            ],
+            "top": 205,
+            "width": 109
+          },
+          "op": "drawString",
+          "text": "BUILDING SOKKON",
+          "text_size": 1,
+          "x": 233,
+          "y": 213
+        },
+        {
+          "background": 0,
+          "color": 54938,
+          "datum": "middle_center",
+          "font": "Font2",
+          "font_size": 16,
+          "layout": {
+            "baseline": 263,
+            "height": 16,
+            "left": 180,
+            "pen": [
+              180,
+              188,
+              196,
+              204,
+              212,
+              220,
+              226,
+              233,
+              239,
+              247,
+              255,
+              263,
+              271,
+              279
+            ],
+            "top": 250,
+            "width": 107
+          },
+          "op": "drawString",
+          "text": "FOCUS / PAUSED",
+          "text_size": 1,
+          "x": 233,
+          "y": 258
+        },
+        {
+          "background": 0,
+          "color": 65535,
+          "datum": "middle_center",
+          "font": "FreeSansBold18pt7b",
+          "font_size": 33,
+          "layout": {
+            "baseline": 310,
+            "height": 33,
+            "left": 144,
+            "pen": [
+              144,
+              163,
+              182,
+              191,
+              210,
+              229,
+              238,
+              257,
+              276,
+              285,
+              304
+            ],
+            "top": 285,
+            "width": 179
+          },
+          "op": "drawString",
+          "text": "00:00:00.00",
+          "text_size": 1,
+          "x": 233,
+          "y": 301
+        },
+        {
+          "color": 65504,
+          "op": "fillCircle",
+          "r": 8,
+          "x": 51,
+          "y": 350
+        },
+        {
+          "background": 0,
+          "color": 65504,
+          "datum": "middle_center",
+          "font": "Font2",
+          "font_size": 16,
+          "layout": {
+            "baseline": 355,
+            "height": 16,
+            "left": 72,
+            "pen": [
+              72,
+              82,
+              90,
+              98
+            ],
+            "top": 342,
+            "width": 34
+          },
+          "op": "drawString",
+          "text": "MARK",
+          "text_size": 1,
+          "x": 89,
+          "y": 350
+        },
+        {
+          "color": 31,
+          "op": "fillCircle",
+          "r": 8,
+          "x": 415,
+          "y": 350
+        },
+        {
+          "background": 0,
+          "color": 31,
+          "datum": "middle_center",
+          "font": "Font2",
+          "font_size": 16,
+          "layout": {
+            "baseline": 355,
+            "height": 16,
+            "left": 358,
+            "pen": [
+              358,
+              368,
+              376,
+              384
+            ],
+            "top": 342,
+            "width": 34
+          },
+          "op": "drawString",
+          "text": "MODE",
+          "text_size": 1,
+          "x": 375,
+          "y": 350
+        },
+        {
+          "background": 0,
+          "color": 54938,
+          "datum": "middle_center",
+          "font": "Font2",
+          "font_size": 16,
+          "layout": {
+            "baseline": 394,
+            "height": 16,
+            "left": 187,
+            "pen": [
+              187,
+              195,
+              203,
+              211,
+              219,
+              227,
+              233,
+              239,
+              247,
+              255,
+              263,
+              271
+            ],
+            "top": 381,
+            "width": 92
+          },
+          "op": "drawString",
+          "text": "TOUCH  FOCUS",
+          "text_size": 1,
+          "x": 233,
+          "y": 389
+        },
+        {
+          "background": 0,
+          "color": 31727,
+          "datum": "middle_center",
+          "font": "Font2",
+          "font_size": 16,
+          "layout": {
+            "baseline": 421,
+            "height": 16,
+            "left": 205,
+            "pen": [
+              205,
+              215,
+              223,
+              231,
+              239,
+              247,
+              253
+            ],
+            "top": 408,
+            "width": 56
+          },
+          "op": "drawString",
+          "text": "MARKS 0",
+          "text_size": 1,
+          "x": 233,
+          "y": 416
+        }
+      ],
+      "label": "outside-ring",
+      "screen": {
+        "battery_percent": 84,
+        "brightness": 96,
+        "charging": false,
+        "connected": true,
+        "context": "CODEX",
+        "detail": "BUILDING SOKKON",
+        "elapsed_ms": 0,
+        "elapsed_text": "00:00:00.00",
+        "focus_running": false,
+        "marks": 0,
+        "mode": "NOW",
+        "sleeping": false,
+        "status": "USB",
+        "time": "12:34",
+        "toast": ""
+      }
+    },
+    {
+      "commands": [
+        {
+          "color": 0,
+          "op": "fillScreen"
+        },
+        {
+          "color": 8484,
+          "op": "drawCircle",
+          "r": 230,
+          "x": 233,
+          "y": 233
+        },
+        {
+          "color": 2047,
+          "op": "drawCircle",
+          "r": 224,
+          "x": 233,
+          "y": 233
+        },
+        {
+          "color": 2047,
+          "end": 18,
+          "inner_radius": 209,
+          "op": "drawArc",
+          "outer_radius": 218,
+          "start": 0,
+          "x": 233,
+          "y": 233
+        },
+        {
+          "background": 0,
+          "color": 2016,
+          "datum": "middle_center",
+          "font": "Font2",
+          "font_size": 16,
+          "layout": {
+            "baseline": 57,
+            "height": 16,
+            "left": 188,
+            "pen": [
+              188,
+              196,
+              204,
+              212,
+              218,
+              224,
+              232,
+              240,
+              248,
+              254,
+              262,
+              270
+            ],
+            "top": 44,
+            "width": 91
+          },
+          "op": "drawString",
+          "text": "USB  BAT 84%",
+          "text_size": 1,
+          "x": 233,
+          "y": 52
+        },
+        {
+          "background": 0,
+          "color": 65535,
+          "datum": "middle_center",
+          "font": "FreeSansBold24pt7b",
+          "font_size": 47,
+          "layout": {
+            "baseline": 110,
+            "height": 47,
+            "left": 175,
+            "pen": [
+              175,
+              201,
+              227,
+              239,
+              265
+            ],
+            "top": 75,
+            "width": 116
+          },
+          "op": "drawString",
+          "text": "12:34",
+          "text_size": 1,
+          "x": 233,
+          "y": 98
+        },
+        {
+          "background": 0,
+          "color": 2047,
+          "datum": "middle_center",
+          "font": "FreeSansBold18pt7b",
+          "font_size": 33,
+          "layout": {
+            "baseline": 157,
+            "height": 33,
+            "left": 190,
+            "pen": [
+              190,
+              216,
+              243
+            ],
+            "top": 132,
+            "width": 87
+          },
+          "op": "drawString",
+          "text": "NOW",
+          "text_size": 1,
+          "x": 233,
+          "y": 148
+        },
+        {
+          "background": 0,
+          "color": 54938,
+          "datum": "middle_center",
+          "font": "Font2",
+          "font_size": 16,
+          "layout": {
+            "baseline": 193,
+            "height": 16,
+            "left": 213,
+            "pen": [
+              213,
+              221,
+              229,
+              237,
+              245
+            ],
+            "top": 180,
+            "width": 40
+          },
+          "op": "drawString",
+          "text": "CODEX",
+          "text_size": 1,
+          "x": 233,
+          "y": 188
+        },
+        {
+          "background": 0,
+          "color": 31727,
+          "datum": "middle_center",
+          "font": "Font2",
+          "font_size": 16,
+          "layout": {
+            "baseline": 218,
+            "height": 16,
+            "left": 179,
+            "pen": [
+              179,
+              187,
+              195,
+              199,
+              206,
+              214,
+              218,
+              226,
+              234,
+              240,
+              248,
+              256,
+              264,
+              272,
+              280
+            ],
+            "top": 205,
+            "width": 109
+          },
+          "op": "drawString",
+          "text": "BUILDING SOKKON",
+          "text_size": 1,
+          "x": 233,
+          "y": 213
+        },
+        {
+          "background": 0,
+          "color": 2047,
+          "datum": "middle_center",
+          "font": "Font2",
+          "font_size": 16,
+          "layout": {
+            "baseline": 263,
+            "height": 16,
+            "left": 178,
+            "pen": [
+              178,
+              186,
+              194,
+              202,
+              210,
+              218,
+              224,
+              231,
+              237,
+              245,
+              253,
+              261,
+              269,
+              273,
+              281
+            ],
+            "top": 250,
+            "width": 111
+          },
+          "op": "drawString",
+          "text": "FOCUS / RUNNING",
+          "text_size": 1,
+          "x": 233,
+          "y": 258
+        },
+        {
+          "background": 0,
+          "color": 65535,
+          "datum": "middle_center",
+          "font": "FreeSansBold18pt7b",
+          "font_size": 33,
+          "layout": {
+            "baseline": 310,
+            "height": 33,
+            "left": 144,
+            "pen": [
+              144,
+              163,
+              182,
+              191,
+              210,
+              229,
+              238,
+              257,
+              276,
+              285,
+              304
+            ],
+            "top": 285,
+            "width": 179
+          },
+          "op": "drawString",
+          "text": "00:00:03.08",
+          "text_size": 1,
+          "x": 233,
+          "y": 301
+        },
+        {
+          "color": 65504,
+          "op": "fillCircle",
+          "r": 8,
+          "x": 51,
+          "y": 350
+        },
+        {
+          "background": 0,
+          "color": 65504,
+          "datum": "middle_center",
+          "font": "Font2",
+          "font_size": 16,
+          "layout": {
+            "baseline": 355,
+            "height": 16,
+            "left": 72,
+            "pen": [
+              72,
+              82,
+              90,
+              98
+            ],
+            "top": 342,
+            "width": 34
+          },
+          "op": "drawString",
+          "text": "MARK",
+          "text_size": 1,
+          "x": 89,
+          "y": 350
+        },
+        {
+          "color": 31,
+          "op": "fillCircle",
+          "r": 8,
+          "x": 415,
+          "y": 350
+        },
+        {
+          "background": 0,
+          "color": 31,
+          "datum": "middle_center",
+          "font": "Font2",
+          "font_size": 16,
+          "layout": {
+            "baseline": 355,
+            "height": 16,
+            "left": 358,
+            "pen": [
+              358,
+              368,
+              376,
+              384
+            ],
+            "top": 342,
+            "width": 34
+          },
+          "op": "drawString",
+          "text": "MODE",
+          "text_size": 1,
+          "x": 375,
+          "y": 350
+        },
+        {
+          "background": 0,
+          "color": 54938,
+          "datum": "middle_center",
+          "font": "Font2",
+          "font_size": 16,
+          "layout": {
+            "baseline": 394,
+            "height": 16,
+            "left": 187,
+            "pen": [
+              187,
+              195,
+              203,
+              211,
+              219,
+              227,
+              233,
+              239,
+              247,
+              255,
+              263,
+              271
+            ],
+            "top": 381,
+            "width": 92
+          },
+          "op": "drawString",
+          "text": "TOUCH  FOCUS",
+          "text_size": 1,
+          "x": 233,
+          "y": 389
+        },
+        {
+          "background": 0,
+          "color": 31727,
+          "datum": "middle_center",
+          "font": "Font2",
+          "font_size": 16,
+          "layout": {
+            "baseline": 421,
+            "height": 16,
+            "left": 205,
+            "pen": [
+              205,
+              215,
+              223,
+              231,
+              239,
+              247,
+              253
+            ],
+            "top": 408,
+            "width": 56
+          },
+          "op": "drawString",
+          "text": "MARKS 0",
+          "text_size": 1,
+          "x": 233,
+          "y": 416
+        }
+      ],
+      "label": "inside-ring",
+      "screen": {
+        "battery_percent": 84,
+        "brightness": 96,
+        "charging": false,
+        "connected": true,
+        "context": "CODEX",
+        "detail": "BUILDING SOKKON",
+        "elapsed_ms": 3106,
+        "elapsed_text": "00:00:03.10",
+        "focus_running": true,
+        "marks": 0,
+        "mode": "NOW",
+        "sleeping": false,
+        "status": "USB",
+        "time": "12:34",
+        "toast": ""
+      }
+    },
+    {
+      "commands": [
+        {
+          "color": 0,
+          "op": "fillScreen"
+        },
+        {
+          "color": 8484,
+          "op": "drawCircle",
+          "r": 230,
+          "x": 233,
+          "y": 233
+        },
+        {
+          "color": 2047,
+          "op": "drawCircle",
+          "r": 224,
+          "x": 233,
+          "y": 233
+        },
+        {
+          "color": 2047,
+          "end": 24,
+          "inner_radius": 209,
+          "op": "drawArc",
+          "outer_radius": 218,
+          "start": 0,
+          "x": 233,
+          "y": 233
+        },
+        {
+          "background": 0,
+          "color": 2016,
+          "datum": "middle_center",
+          "font": "Font2",
+          "font_size": 16,
+          "layout": {
+            "baseline": 57,
+            "height": 16,
+            "left": 188,
+            "pen": [
+              188,
+              196,
+              204,
+              212,
+              218,
+              224,
+              232,
+              240,
+              248,
+              254,
+              262,
+              270
+            ],
+            "top": 44,
+            "width": 91
+          },
+          "op": "drawString",
+          "text": "USB  BAT 84%",
+          "text_size": 1,
+          "x": 233,
+          "y": 52
+        },
+        {
+          "background": 0,
+          "color": 65535,
+          "datum": "middle_center",
+          "font": "FreeSansBold24pt7b",
+          "font_size": 47,
+          "layout": {
+            "baseline": 110,
+            "height": 47,
+            "left": 175,
+            "pen": [
+              175,
+              201,
+              227,
+              239,
+              265
+            ],
+            "top": 75,
+            "width": 116
+          },
+          "op": "drawString",
+          "text": "12:34",
+          "text_size": 1,
+          "x": 233,
+          "y": 98
+        },
+        {
+          "background": 0,
+          "color": 2047,
+          "datum": "middle_center",
+          "font": "FreeSansBold18pt7b",
+          "font_size": 33,
+          "layout": {
+            "baseline": 157,
+            "height": 33,
+            "left": 190,
+            "pen": [
+              190,
+              216,
+              243
+            ],
+            "top": 132,
+            "width": 87
+          },
+          "op": "drawString",
+          "text": "NOW",
+          "text_size": 1,
+          "x": 233,
+          "y": 148
+        },
+        {
+          "background": 0,
+          "color": 54938,
+          "datum": "middle_center",
+          "font": "Font2",
+          "font_size": 16,
+          "layout": {
+            "baseline": 193,
+            "height": 16,
+            "left": 213,
+            "pen": [
+              213,
+              221,
+              229,
+              237,
+              245
+            ],
+            "top": 180,
+            "width": 40
+          },
+          "op": "drawString",
+          "text": "CODEX",
+          "text_size": 1,
+          "x": 233,
+          "y": 188
+        },
+        {
+          "background": 0,
+          "color": 31727,
+          "datum": "middle_center",
+          "font": "Font2",
+          "font_size": 16,
+          "layout": {
+            "baseline": 218,
+            "height": 16,
+            "left": 179,
+            "pen": [
+              179,
+              187,
+              195,
+              199,
+              206,
+              214,
+              218,
+              226,
+              234,
+              240,
+              248,
+              256,
+              264,
+              272,
+              280
+            ],
+            "top": 205,
+            "width": 109
+          },
+          "op": "drawString",
+          "text": "BUILDING SOKKON",
+          "text_size": 1,
+          "x": 233,
+          "y": 213
+        },
+        {
+          "background": 0,
+          "color": 2047,
+          "datum": "middle_center",
+          "font": "Font2",
+          "font_size": 16,
+          "layout": {
+            "baseline": 263,
+            "height": 16,
+            "left": 178,
+            "pen": [
+              178,
+              186,
+              194,
+              202,
+              210,
+              218,
+              224,
+              231,
+              237,
+              245,
+              253,
+              261,
+              269,
+              273,
+              281
+            ],
+            "top": 250,
+            "width": 111
+          },
+          "op": "drawString",
+          "text": "FOCUS / RUNNING",
+          "text_size": 1,
+          "x": 233,
+          "y": 258
+        },
+        {
+          "background": 0,
+          "color": 65535,
+          "datum": "middle_center",
+          "font": "FreeSansBold18pt7b",
+          "font_size": 33,
+          "layout": {
+            "baseline": 310,
+            "height": 33,
+            "left": 144,
+            "pen": [
+              144,
+              163,
+              182,
+              191,
+              210,
+              229,
+              238,
+              257,
+              276,
+              285,
+              304
+            ],
+            "top": 285,
+            "width": 179
+          },
+          "op": "drawString",
+          "text": "00:00:04.18",
+          "text_size": 1,
+          "x": 233,
+          "y": 301
+        },
+        {
+          "color": 65504,
+          "op": "fillCircle",
+          "r": 8,
+          "x": 51,
+          "y": 350
+        },
+        {
+          "background": 0,
+          "color": 65504,
+          "datum": "middle_center",
+          "font": "Font2",
+          "font_size": 16,
+          "layout": {
+            "baseline": 355,
+            "height": 16,
+            "left": 72,
+            "pen": [
+              72,
+              82,
+              90,
+              98
+            ],
+            "top": 342,
+            "width": 34
+          },
+          "op": "drawString",
+          "text": "MARK",
+          "text_size": 1,
+          "x": 89,
+          "y": 350
+        },
+        {
+          "color": 31,
+          "op": "fillCircle",
+          "r": 8,
+          "x": 415,
+          "y": 350
+        },
+        {
+          "background": 0,
+          "color": 31,
+          "datum": "middle_center",
+          "font": "Font2",
+          "font_size": 16,
+          "layout": {
+            "baseline": 355,
+            "height": 16,
+            "left": 358,
+            "pen": [
+              358,
+              368,
+              376,
+              384
+            ],
+            "top": 342,
+            "width": 34
+          },
+          "op": "drawString",
+          "text": "MODE",
+          "text_size": 1,
+          "x": 375,
+          "y": 350
+        },
+        {
+          "background": 0,
+          "color": 54938,
+          "datum": "middle_center",
+          "font": "Font2",
+          "font_size": 16,
+          "layout": {
+            "baseline": 394,
+            "height": 16,
+            "left": 187,
+            "pen": [
+              187,
+              195,
+              203,
+              211,
+              219,
+              227,
+              233,
+              239,
+              247,
+              255,
+              263,
+              271
+            ],
+            "top": 381,
+            "width": 92
+          },
+          "op": "drawString",
+          "text": "TOUCH  FOCUS",
+          "text_size": 1,
+          "x": 233,
+          "y": 389
+        },
+        {
+          "background": 0,
+          "color": 31727,
+          "datum": "middle_center",
+          "font": "Font2",
+          "font_size": 16,
+          "layout": {
+            "baseline": 421,
+            "height": 16,
+            "left": 205,
+            "pen": [
+              205,
+              215,
+              223,
+              231,
+              239,
+              247,
+              253
+            ],
+            "top": 408,
+            "width": 56
+          },
+          "op": "drawString",
+          "text": "MARKS 0",
+          "text_size": 1,
+          "x": 233,
+          "y": 416
+        }
+      ],
+      "label": "corner-ignored",
+      "screen": {
+        "battery_percent": 84,
+        "brightness": 96,
+        "charging": false,
+        "connected": true,
+        "context": "CODEX",
+        "detail": "BUILDING SOKKON",
+        "elapsed_ms": 4212,
+        "elapsed_text": "00:00:04.21",
+        "focus_running": true,
+        "marks": 0,
+        "mode": "NOW",
+        "sleeping": false,
+        "status": "USB",
+        "time": "12:34",
+        "toast": ""
+      }
+    }
+  ]
+}

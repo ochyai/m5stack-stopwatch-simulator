@@ -94,6 +94,11 @@ public actor SimulatorManager {
         return try checkedRequest(.action(action), using: runner, firmware: selectedFirmware)
     }
 
+    public func touch(x: Int32, y: Int32) async throws -> NativeSnapshot {
+        let runner = try ensureRunner()
+        return try checkedRequest(.touch(x: x, y: y), using: runner, firmware: selectedFirmware)
+    }
+
     public func advance(milliseconds: UInt64) async throws -> NativeSnapshot {
         guard milliseconds <= selectedFirmware.maximumAdvanceMilliseconds else {
             throw SimulatorManagerError.advanceOutOfRange(

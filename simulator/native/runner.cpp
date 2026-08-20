@@ -45,6 +45,7 @@ class SokkonHost final : public sim_host::Host {
     auto& state = sokkon_sim::runtime();
     state.battery_percent = scenario.battery_percent;
     state.charging = scenario.charging;
+    sim_host::applyTilt(scenario.tilt_x, scenario.tilt_y);
     setup();
     processDeviceOutput();
     injectHostState();
@@ -79,16 +80,20 @@ class SokkonHost final : public sim_host::Host {
       runFirmwareLoop();
       scenario.host_mode = kModes[mode_index];
     } else if (action == "FOCUS" || action == "WAKE") {
-      state.touch_x = M5.Display.width() / 2;
-      state.touch_y = M5.Display.height() / 2;
-      state.touch_pressed = true;
-      runFirmwareLoop();
-      state.touch_pressed = false;
-      runFirmwareLoop();
+      // The named action is the centre of the panel; TOUCH reaches anywhere.
+      performTouch(M5.Display.width() / 2, M5.Display.height() / 2);
+      return;
     } else {
       command_error = "unsupported action";
       return;
     }
+    processDeviceOutput();
+    settleInput();
+  }
+
+  void runOneLoop() override { runFirmwareLoop(); }
+
+  void settleInput() override {
     processDeviceOutput();
     settleAtCurrentTime();
     advanceRuntimeByMs(101);

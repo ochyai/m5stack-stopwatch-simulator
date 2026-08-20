@@ -109,6 +109,28 @@ class ScriptGrammarTest(unittest.TestCase):
           parse_script(script)
         self.assertIn(fragment, str(raised.exception))
 
+  def test_a_touch_carries_its_panel_coordinate(self) -> None:
+    steps = parse_script("TOUCH 233 60\nTOUCH 0 465\n")
+    self.assertEqual([step.value for step in steps], [(233, 60), (0, 465)])
+    self.assertEqual(steps[0].render(), "TOUCH 233 60")
+
+  def test_a_touch_outside_the_panel_is_rejected(self) -> None:
+    for script, fragment in (
+      ("TOUCH 466 0", "inside 0..465"),
+      ("TOUCH 0 -1", "inside 0..465"),
+      ("TOUCH 233", "an x and a y"),
+      ("TOUCH a b", "whole numbers"),
+    ):
+      with self.subTest(script=script):
+        with self.assertRaises(SessionError) as raised:
+          parse_script(script)
+        self.assertIn(fragment, str(raised.exception))
+
+  def test_tilt_is_a_scenario_field(self) -> None:
+    steps = parse_script("CONFIGURE tilt_x 0.6\nCONFIGURE tilt_y -0.3\n")
+    self.assertEqual([step.value for step in steps], [0.6, -0.3])
+    self.assertEqual(steps[0].render(), "CONFIGURE tilt_x 0.6")
+
   def test_steps_render_back_into_a_replayable_script(self) -> None:
     original = "ACTION focus\nADVANCE 250\nCONFIGURE connected true\nRESET\nSHOT done\n"
     steps = parse_script(original)
@@ -211,6 +233,9 @@ class RecordingBackend:
   def perform_action(self, action: str) -> dict[str, Any]:
     return self._record("perform_action", action)
 
+  def touch(self, x: int, y: int) -> dict[str, Any]:
+    return self._record("touch", (x, y))
+
   def advance(self, milliseconds: int) -> dict[str, Any]:
     return self._record("advance", milliseconds)
 
@@ -225,12 +250,13 @@ class SessionReplayTest(unittest.TestCase):
   def test_a_replay_freezes_time_and_dispatches_every_step(self) -> None:
     backend = RecordingBackend()
     steps = parse_script(
-      "ACTION mark\nADVANCE 500\nCONFIGURE context CODEX\nNOTE why\nSHOT one\n"
+      "ACTION mark\nTOUCH 233 233\nADVANCE 500\nCONFIGURE context CODEX\nNOTE why\nSHOT one\n"
     )
     result = run_session(backend, steps, firmware_id="10_sokkon")
 
     self.assertEqual(backend.calls[0], ("freeze_time", True))
     self.assertIn(("perform_action", "mark"), backend.calls)
+    self.assertIn(("touch", (233, 233)), backend.calls)
     self.assertIn(("advance", 500), backend.calls)
     self.assertIn(("configure", {"context": "CODEX"}), backend.calls)
     self.assertEqual(result.notes, ["why"])
@@ -264,6 +290,7 @@ class ScriptRecorderTest(unittest.TestCase):
     with tempfile.TemporaryDirectory() as workspace:
       path = Path(workspace) / "nested" / "session.sim"
       recorder = ScriptRecorder(path)
+      recorder.record_touch(233, 60)
       recorder.record_action("mark")
       recorder.record_action("advance_30s")
       recorder.record_action("reset")
@@ -277,6 +304,7 @@ class ScriptRecorderTest(unittest.TestCase):
       self.assertEqual(
         [step.render() for step in steps],
         [
+          "TOUCH 233 60",
           "ACTION mark",
           "ADVANCE 30001",
           "RESET",

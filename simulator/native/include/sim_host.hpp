@@ -154,6 +154,10 @@ struct Scenario {
   int battery_percent = 84;
   bool charging = false;
   double time_scale = 1.0;
+  // Accelerometer reading in g along the panel's x and y axes: how the device
+  // is being held.
+  double tilt_x = 0.12;
+  double tilt_y = -0.08;
 };
 
 inline bool parseBoolean(const std::string& value, bool* output) {
@@ -176,6 +180,28 @@ inline uint64_t parseUnsigned(const std::string& value, uint64_t maximum) {
     throw std::out_of_range("integer outside range");
   }
   return static_cast<uint64_t>(parsed);
+}
+
+inline double parseTilt(const std::string& value) {
+  size_t consumed = 0;
+  const double parsed = std::stod(value, &consumed);
+  if (consumed != value.size() || !std::isfinite(parsed) || parsed < -1.0 ||
+      parsed > 1.0) {
+    throw std::invalid_argument("tilt outside -1 g to 1 g");
+  }
+  return parsed;
+}
+
+// Gravity has a fixed magnitude, so whatever the x and y axes do not take is
+// what the z axis reads. A viewer that sets only a tilt still gets a physically
+// possible accelerometer sample.
+inline void applyTilt(double tilt_x, double tilt_y) {
+  auto& state = sokkon_sim::runtime();
+  state.imu_accel_x = static_cast<float>(tilt_x);
+  state.imu_accel_y = static_cast<float>(tilt_y);
+  const double squared = tilt_x * tilt_x + tilt_y * tilt_y;
+  state.imu_accel_z =
+      squared >= 1.0 ? 0.0F : static_cast<float>(std::sqrt(1.0 - squared));
 }
 
 inline double parseTimeScale(const std::string& value) {
@@ -229,6 +255,12 @@ inline bool applyCommonScenarioField(Scenario& scenario, const std::string& key,
     scenario.time_scale = parseTimeScale(value);
     return true;
   }
+  if (key == "TILT_X" || key == "TILT_Y") {
+    const double tilt = parseTilt(value);
+    (key == "TILT_X" ? scenario.tilt_x : scenario.tilt_y) = tilt;
+    applyTilt(scenario.tilt_x, scenario.tilt_y);
+    return true;
+  }
   return false;
 }
 
@@ -242,7 +274,9 @@ inline void appendScenarioJson(std::ostringstream& output,
          << ",\"host_mode\":" << jsonEscape(scenario.host_mode)
          << ",\"battery_percent\":" << scenario.battery_percent
          << ",\"charging\":" << (scenario.charging ? "true" : "false")
-         << ",\"time_scale\":" << scenario.time_scale << '}';
+         << ",\"time_scale\":" << scenario.time_scale
+         << ",\"tilt_x\":" << scenario.tilt_x
+         << ",\"tilt_y\":" << scenario.tilt_y << '}';
 }
 
 // Replace the pipe-delimited protocol's separators so a scenario string can
@@ -433,7 +467,7 @@ inline uint64_t millisecondsToUs(uint64_t milliseconds) {
 // ---------------------------------------------------------------------------
 
 struct Command {
-  enum class Kind { Snapshot, Action, Advance, Configure, Freeze, Unsupported };
+  enum class Kind { Snapshot, Action, Touch, Advance, Configure, Freeze, Unsupported };
 
   Kind kind = Kind::Unsupported;
   std::string first;
@@ -450,6 +484,13 @@ inline Command parseCommand(const std::string& line) {
   } else if (line.rfind("ADVANCE\t", 0) == 0) {
     command.kind = Command::Kind::Advance;
     command.first = line.substr(8);
+  } else if (line.rfind("TOUCH\t", 0) == 0) {
+    const size_t separator = line.find('\t', 6);
+    if (separator != std::string::npos) {
+      command.kind = Command::Kind::Touch;
+      command.first = line.substr(6, separator - 6);
+      command.second = line.substr(separator + 1);
+    }
   } else if (line.rfind("FREEZE\t", 0) == 0) {
     command.kind = Command::Kind::Freeze;
     command.first = line.substr(7);
@@ -502,6 +543,14 @@ class Host {
       case Command::Kind::Action:
         performAction(command.first);
         break;
+      case Command::Kind::Touch:
+        try {
+          performTouch(parseCoordinate(command.first),
+                       parseCoordinate(command.second));
+        } catch (const std::exception& error) {
+          command_error = error.what();
+        }
+        break;
       case Command::Kind::Advance:
         try {
           advance(parseUnsigned(command.first, maximumAdvanceMs()));
@@ -522,9 +571,13 @@ class Host {
         }
         break;
       case Command::Kind::Unsupported:
-        command_error = line.rfind("CONFIGURE\t", 0) == 0
-                            ? "CONFIGURE requires key and value"
-                            : "unsupported command";
+        if (line.rfind("CONFIGURE\t", 0) == 0) {
+          command_error = "CONFIGURE requires key and value";
+        } else if (line.rfind("TOUCH\t", 0) == 0) {
+          command_error = "TOUCH requires x and y";
+        } else {
+          command_error = "unsupported command";
+        }
         break;
     }
     ++revision;
@@ -545,6 +598,31 @@ class Host {
   virtual void beforeCommand() {}
   virtual void settle() {}
   virtual void syncWallClock() = 0;
+
+  // Run the production loop once, and give it the window it needs to redraw
+  // after an input. Both are firmware-specific; touch handling is not.
+  virtual void runOneLoop() = 0;
+  virtual void settleInput() = 0;
+
+  // Press and release at an exact panel coordinate. The firmware decides what
+  // that means: 10_sokkon only treats a press inside its focus ring as a focus
+  // toggle, and a simulator that could only reach the centre could never show
+  // that.
+  virtual void performTouch(int32_t x, int32_t y) {
+    auto& state = sokkon_sim::runtime();
+    state.touch_x = x;
+    state.touch_y = y;
+    state.touch_pressed = true;
+    runOneLoop();
+    state.touch_pressed = false;
+    runOneLoop();
+    settleInput();
+  }
+
+  static int32_t parseCoordinate(const std::string& value) {
+    const uint64_t parsed = parseUnsigned(value, 465);
+    return static_cast<int32_t>(parsed);
+  }
 
   // Shared state every runner reports.
   Scenario scenario;

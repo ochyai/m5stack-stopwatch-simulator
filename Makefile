@@ -7,6 +7,8 @@ ARGS ?=
 FIRMWARE ?= 10_sokkon
 SCRIPT ?=
 SESSION_OUT ?= .simulator/sessions
+IDENTITY ?=
+PROFILE ?=
 
 # Recipes only receive one of these trusted constants. A command-line make
 # variable is never interpolated into a shell command verbatim.
@@ -18,7 +20,7 @@ else
 override SIMULATOR_FIRMWARE := unsupported
 endif
 
-.PHONY: help build build-all test simulator-build simulator simulator-serve simulator-test session session-report golden-update font-metrics workbench-install workbench-build workbench-test workbench companion companion-pair companion-once companion-test macos-app macos-dmg clean device-info backup flash monitor
+.PHONY: help build build-all test simulator-build simulator simulator-serve simulator-test session session-report golden-update font-metrics workbench-install workbench-build workbench-test workbench companion companion-pair companion-once companion-test macos-app macos-dmg macos-release macos-notarize clean device-info backup flash monitor
 
 help: ## Show the available commands
 	@awk 'BEGIN {FS = ":.*## "; printf "Usage: make <target> [ENV=name] [FIRMWARE=10_sokkon|99_stopwatch] [SCRIPT=scenarios/x.sim] [PORT=/dev/cu.usbmodem...] [ARGS=\"...\"]\n\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-18s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -76,6 +78,16 @@ macos-app: ## Build the standalone M5Stack Simulator.app for this Mac
 
 macos-dmg: macos-app ## Package the local app as a versioned DMG with SHA-256
 	@./macos/M5StackSimulator/scripts/build-dmg.sh
+
+macos-release: ## Build a Developer ID signed app and DMG (IDENTITY="Developer ID Application: ...")
+	@[[ -n "$(IDENTITY)" ]] || { echo 'usage: make macos-release IDENTITY="Developer ID Application: NAME (TEAMID)"' >&2; exit 2; }
+	@./macos/M5StackSimulator/scripts/build-app.sh --developer-id "$(IDENTITY)"
+	@./macos/M5StackSimulator/scripts/build-dmg.sh
+	@echo 'next: make macos-notarize PROFILE=<notarytool keychain profile>'
+
+macos-notarize: ## Notarize and staple the newest DMG (PROFILE=<notarytool keychain profile>)
+	@[[ -n "$(PROFILE)" ]] || { echo 'usage: make macos-notarize PROFILE=<notarytool keychain profile>' >&2; exit 2; }
+	@./macos/M5StackSimulator/scripts/notarize-dmg.sh --keychain-profile "$(PROFILE)"
 
 companion: ## Run the local-first macOS Sokkon USB companion (pass ARGS="...")
 	@python3 -m companion $(ARGS)

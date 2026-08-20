@@ -1,0 +1,18 @@
+# 10_sokkon only treats a press inside its focus ring as a focus toggle. A
+# simulator that could only reach the centre of the panel could not show that.
+NOTE The ring is 145 px around the centre of a 466 px panel.
+SHOT idle
+
+NOTE Near the top edge, 173 px out: the firmware must ignore it.
+TOUCH 233 60
+SHOT outside-ring
+
+NOTE Dead centre: the focus timer starts.
+TOUCH 233 233
+ADVANCE 3000
+SHOT inside-ring
+
+NOTE A corner press is outside the ring and also outside the round glass.
+TOUCH 400 400
+ADVANCE 1000
+SHOT corner-ignored

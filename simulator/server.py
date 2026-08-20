@@ -172,13 +172,33 @@ class SimulatorRequestHandler(BaseHTTPRequestHandler):
       path = self._request_path()
       if path == "/api/action":
         payload = self._read_json_object()
-        if set(payload) != {"action"}:
+        fields = set(payload)
+        if fields == {"action", "x", "y"}:
+          action = normalize_action(payload["action"])
+          if action != "touch":
+            raise RequestError(
+              HTTPStatus.BAD_REQUEST,
+              "invalid_action_request",
+              "only a touch action carries a coordinate",
+            )
+          x, y = payload["x"], payload["y"]
+          body = self._backend_json(lambda: self.server.backend.touch(x, y))
+          self._record(lambda recorder: recorder.record_touch(x, y))
+          self._send_json_bytes(HTTPStatus.OK, body)
+          return
+        if fields != {"action"}:
           raise RequestError(
             HTTPStatus.BAD_REQUEST,
             "invalid_action_request",
             "action request must contain exactly one 'action' field",
           )
         action = normalize_action(payload["action"])
+        if action == "touch":
+          raise RequestError(
+            HTTPStatus.BAD_REQUEST,
+            "invalid_action_request",
+            "a touch action requires 'x' and 'y'",
+          )
         if action == "reset":
           body = self._backend_json(lambda: self.server.backend.reset())
         else:

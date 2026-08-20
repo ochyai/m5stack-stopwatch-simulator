@@ -33,6 +33,9 @@ public enum FirmwareAction: String, CaseIterable, Sendable, Codable {
     case wake = "WAKE"
 }
 
+/// The panel is 466 x 466 pixels, and a touch is addressed in those pixels.
+public let displaySize: Int32 = 466
+
 public enum ScenarioKey: String, CaseIterable, Sendable, Codable {
     case connected = "CONNECTED"
     case outcome = "OUTCOME"
@@ -43,11 +46,14 @@ public enum ScenarioKey: String, CaseIterable, Sendable, Codable {
     case batteryPercent = "BATTERY_PERCENT"
     case charging = "CHARGING"
     case timeScale = "TIME_SCALE"
+    case tiltX = "TILT_X"
+    case tiltY = "TILT_Y"
 }
 
 public enum RunnerCommand: Sendable, Equatable {
     case snapshot
     case action(FirmwareAction)
+    case touch(x: Int32, y: Int32)
     case advance(milliseconds: UInt64)
     case configure(key: ScenarioKey, value: String)
 
@@ -57,6 +63,11 @@ public enum RunnerCommand: Sendable, Equatable {
             return "SNAPSHOT"
         case let .action(action):
             return "ACTION\t\(action.rawValue)"
+        case let .touch(x, y):
+            guard (0..<displaySize).contains(x), (0..<displaySize).contains(y) else {
+                throw RunnerCommandError.touchOutsidePanel
+            }
+            return "TOUCH\t\(x)\t\(y)"
         case let .advance(milliseconds):
             guard milliseconds <= maximumAdvanceMilliseconds else {
                 throw RunnerCommandError.advanceOutOfRange
@@ -78,6 +89,7 @@ public enum RunnerCommand: Sendable, Equatable {
 
 public enum RunnerCommandError: Error, Sendable, Equatable, LocalizedError {
     case advanceOutOfRange
+    case touchOutsidePanel
     case valueTooLong
     case controlSeparator
 
@@ -85,6 +97,8 @@ public enum RunnerCommandError: Error, Sendable, Equatable, LocalizedError {
         return switch self {
         case .advanceOutOfRange:
             "virtual-time advance is outside the firmware limit"
+        case .touchOutsidePanel:
+            "touch coordinate is outside the 466 x 466 panel"
         case .valueTooLong:
             "configuration value exceeds 1024 UTF-8 bytes"
         case .controlSeparator:

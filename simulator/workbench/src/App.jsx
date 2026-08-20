@@ -112,8 +112,21 @@ function FirmwareCanvas({ frame, screen, canvasRef, onPress }) {
     renderFrame(canvas.getContext("2d", { alpha: false }), frame, WORKBENCH_TYPOGRAPHY);
   }, [canvasRef, frame]);
 
+  // The firmware reads where the finger landed, so report the panel pixel the
+  // pointer is over rather than always poking the centre.
+  const press = (event) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const bounds = canvas.getBoundingClientRect();
+    if (!bounds.width || !bounds.height) return;
+    const x = Math.round(((event.clientX - bounds.left) / bounds.width) * DEVICE_SIZE);
+    const y = Math.round(((event.clientY - bounds.top) / bounds.height) * DEVICE_SIZE);
+    if (x < 0 || y < 0 || x >= DEVICE_SIZE || y >= DEVICE_SIZE) return;
+    onPress(x, y);
+  };
+
   return (
-    <button className="screen-button" type="button" onClick={onPress} aria-label="Simulate center touch">
+    <button className="screen-button" type="button" onClick={press} aria-label="Touch the device screen">
       <canvas
         ref={canvasRef}
         className="firmware-canvas"
@@ -341,6 +354,20 @@ export function App() {
       setPendingControl("");
     }
   }, [applySnapshot, beginNativeGeneration, pendingControl, pushLocalEvent]);
+
+  const sendTouch = useCallback(async (x, y) => {
+    if (pendingControl) return;
+    setPendingControl("touch");
+    try {
+      applySnapshot(await simulatorClient.touch(x, y));
+      pushLocalEvent("INPUT", "Screen touched", `${x},${y}`);
+    } catch (error) {
+      setConnection(hasLiveSnapshot.current ? "error" : "demo");
+      pushLocalEvent("SYSTEM", "Touch failed", safeText(error.message, "Backend unavailable"));
+    } finally {
+      setPendingControl("");
+    }
+  }, [applySnapshot, pendingControl, pushLocalEvent]);
 
   useEffect(() => {
     const onKeyDown = (event) => {
@@ -617,7 +644,7 @@ export function App() {
           <div className="device-visual" data-testid="device-visual">
             <img src="/device-shell.png" className="device-shell-raster" alt="" draggable="false" />
             <div className="device-screen">
-              <FirmwareCanvas frame={snapshot.frame} screen={screen} canvasRef={canvasRef} onPress={() => sendAction("focus", "Screen touched")} />
+              <FirmwareCanvas frame={snapshot.frame} screen={screen} canvasRef={canvasRef} onPress={sendTouch} />
             </div>
             <button className="hardware-hit hardware-a" type="button" onClick={() => sendAction("mark", "Button A pressed")} aria-label={`Button A: ${firmware.primary_label ?? "Primary action"}`} />
             <button className="hardware-hit hardware-b" type="button" onClick={() => sendAction("mode", "Button B pressed")} aria-label={`Button B: ${firmware.secondary_label ?? "Secondary action"}`} />

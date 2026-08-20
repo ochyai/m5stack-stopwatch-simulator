@@ -1,0 +1,11 @@
+# 99_stopwatch prints the accelerometer it reads. Tilting the device changes
+# that readout on the firmware's own 500 ms sensor tick.
+SHOT resting
+
+CONFIGURE tilt_x 0.6
+CONFIGURE tilt_y -0.3
+SHOT tilted-right
+
+CONFIGURE tilt_x -0.75
+CONFIGURE tilt_y 0.4
+SHOT tilted-left

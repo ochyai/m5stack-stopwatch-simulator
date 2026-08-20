@@ -2,6 +2,7 @@ import {
   boolValue,
   clamp,
   finiteNumber,
+  DEVICE_SIZE,
   renderFrame as renderDeviceFrame,
   safeText,
   screenOpacity,
@@ -75,6 +76,10 @@ import {
     detailInput: document.getElementById("detail-input"),
     modeInput: document.getElementById("mode-input"),
     batteryInput: document.getElementById("battery-input"),
+    tiltXInput: document.getElementById("tilt-x-input"),
+    tiltXOutput: document.getElementById("tilt-x-output"),
+    tiltYInput: document.getElementById("tilt-y-input"),
+    tiltYOutput: document.getElementById("tilt-y-output"),
     chargingInput: document.getElementById("charging-input"),
     hapticReadout: document.getElementById("haptic-readout"),
     hapticLabel: document.getElementById("haptic-label"),
@@ -415,6 +420,10 @@ import {
     setInputValue(elements.detailInput, scenario.detail);
     setInputValue(elements.modeInput, scenario.host_mode);
     setInputValue(elements.batteryInput, scenario.battery_percent);
+    setInputValue(elements.tiltXInput, scenario.tilt_x);
+    setInputValue(elements.tiltYInput, scenario.tilt_y);
+    updateRangeDisplay(elements.tiltXInput, elements.tiltXOutput);
+    updateRangeDisplay(elements.tiltYInput, elements.tiltYOutput);
     if (scenario.charging !== undefined) elements.chargingInput.checked = boolValue(scenario.charging);
     updateRangeDisplay(elements.latencyInput, elements.latencyOutput);
     state.controlsHydrated = true;
@@ -470,6 +479,33 @@ import {
     }
   }
 
+  // Where on the panel the pointer landed, in the device's own pixels. The
+  // firmware reads the coordinate, so the whole glass has to be addressable.
+  function devicePoint(event) {
+    const bounds = elements.canvas.getBoundingClientRect();
+    if (!bounds.width || !bounds.height) return null;
+    const x = Math.round(((event.clientX - bounds.left) / bounds.width) * DEVICE_SIZE);
+    const y = Math.round(((event.clientY - bounds.top) / bounds.height) * DEVICE_SIZE);
+    if (x < 0 || y < 0 || x >= DEVICE_SIZE || y >= DEVICE_SIZE) return null;
+    return { x, y };
+  }
+
+  async function sendTouch(event) {
+    const point = devicePoint(event);
+    if (point === null) return;
+    try {
+      const snapshot = await apiRequest("/api/action", {
+        method: "POST",
+        body: JSON.stringify({ action: "touch", x: point.x, y: point.y }),
+      });
+      if (snapshot && snapshot.screen) renderSnapshot(snapshot);
+      setApiState("ok", `TOUCH ${point.x},${point.y}`);
+      await poll();
+    } catch (error) {
+      setApiState("error", `POST TOUCH · ${safeText(error.message)}`);
+    }
+  }
+
   function animatePress(button) {
     button.classList.remove("is-pressed");
     void button.offsetWidth;
@@ -481,6 +517,8 @@ import {
     const devicePayload = {
       battery_percent: Math.round(clamp(elements.batteryInput.value, 0, 100)),
       charging: elements.chargingInput.checked,
+      tilt_x: clamp(elements.tiltXInput.value, -1, 1),
+      tilt_y: clamp(elements.tiltYInput.value, -1, 1),
     };
     if (!state.hostControls) return devicePayload;
     const outcome = document.querySelector('input[name="outcome"]:checked');
@@ -517,13 +555,22 @@ import {
     state.scenarioTimer = window.setTimeout(updateScenario, 120);
   }
 
+  // Each slider reports its own quantity: milliseconds are whole, and an
+  // accelerometer reading is not.
+  const RANGE_FORMATS = new Map([
+    ["latency_ms", (value) => `${Math.round(value)} ms`],
+    ["tilt_x", (value) => `${value.toFixed(2)} g`],
+    ["tilt_y", (value) => `${value.toFixed(2)} g`],
+  ]);
+
   function updateRangeDisplay(input, output) {
     const minimum = finiteNumber(input.min, 0);
     const maximum = finiteNumber(input.max, 100);
     const value = clamp(input.value, minimum, maximum);
     const fill = maximum === minimum ? 0 : ((value - minimum) / (maximum - minimum)) * 100;
     input.style.setProperty("--range-fill", `${fill}%`);
-    output.textContent = `${Math.round(value)} ms`;
+    const format = RANGE_FORMATS.get(input.dataset.scenario) ?? ((amount) => String(amount));
+    output.textContent = format(value);
   }
 
   function resizeDevice() {
@@ -539,6 +586,7 @@ import {
     return target instanceof HTMLElement && (target.matches("input, select, textarea") || target.isContentEditable);
   }
 
+  elements.canvas.addEventListener("click", sendTouch);
   elements.markButton.addEventListener("click", () => sendAction("mark", elements.markButton));
   elements.modeButton.addEventListener("click", () => sendAction("mode", elements.modeButton));
   elements.focusButton.addEventListener("click", () => sendAction(state.sleeping ? "wake" : "focus", elements.focusButton));
@@ -560,10 +608,18 @@ import {
     }
   });
 
+  // Every range control shows the value it is sending while it is dragged.
+  const RANGE_OUTPUTS = new Map([
+    [elements.latencyInput, elements.latencyOutput],
+    [elements.tiltXInput, elements.tiltXOutput],
+    [elements.tiltYInput, elements.tiltYOutput],
+  ]);
+
   document.querySelectorAll("[data-scenario]").forEach((input) => {
     const eventName = input.matches('input[type="text"], input[type="number"], input[type="range"]') ? "input" : "change";
     input.addEventListener(eventName, () => {
-      if (input === elements.latencyInput) updateRangeDisplay(elements.latencyInput, elements.latencyOutput);
+      const output = RANGE_OUTPUTS.get(input);
+      if (output) updateRangeDisplay(input, output);
       scheduleScenarioUpdate();
     });
   });
@@ -583,6 +639,8 @@ import {
   }
 
   updateRangeDisplay(elements.latencyInput, elements.latencyOutput);
+  updateRangeDisplay(elements.tiltXInput, elements.tiltXOutput);
+  updateRangeDisplay(elements.tiltYInput, elements.tiltYOutput);
   resizeDevice();
   poll();
   window.setInterval(poll, POLL_INTERVAL_MS);

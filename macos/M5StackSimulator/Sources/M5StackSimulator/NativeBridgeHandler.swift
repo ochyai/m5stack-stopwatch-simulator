@@ -32,6 +32,7 @@ final class NativeBridgeHandler: NSObject, WKScriptMessageHandlerWithReply {
         selectFirmware: (id) => call("selectFirmware", { id }),
         reset: () => call("reset"),
         action: (name) => call("action", { name }),
+        touch: (x, y) => call("touch", { x, y }),
         advance: (milliseconds) => call("advance", { milliseconds }),
         configure: (key, value) => call("configure", { key, value }),
       });
@@ -100,6 +101,8 @@ final class NativeBridgeHandler: NSObject, WKScriptMessageHandlerWithReply {
             return .object(try await manager.reset().root)
         case let .action(action):
             return .object(try await manager.perform(action).root)
+        case let .touch(x, y):
+            return .object(try await manager.touch(x: x, y: y).root)
         case let .advance(milliseconds):
             return .object(try await manager.advance(milliseconds: milliseconds).root)
         case let .configure(key, value):
@@ -134,6 +137,7 @@ private enum BridgeRequest: Sendable {
     case selectFirmware(FirmwareID)
     case reset
     case action(FirmwareAction)
+    case touch(Int32, Int32)
     case advance(UInt64)
     case configure(ScenarioKey, String)
 
@@ -166,6 +170,12 @@ private enum BridgeRequest: Sendable {
                 throw NativeBridgeInputError.unsupportedAction
             }
             self = .action(action)
+        case "touch":
+            // The firmware reads where the press landed, so the coordinate is
+            // validated against the panel before it reaches the runner.
+            let x = try Self.unsignedInteger(payload["x"], field: "x", maximum: UInt64(displaySize - 1))
+            let y = try Self.unsignedInteger(payload["y"], field: "y", maximum: UInt64(displaySize - 1))
+            self = .touch(Int32(x), Int32(y))
         case "advance":
             self = .advance(try Self.unsignedInteger(
                 payload["milliseconds"],
@@ -195,6 +205,8 @@ private enum BridgeRequest: Sendable {
         case "battery_percent": .batteryPercent
         case "charging": .charging
         case "time_scale": .timeScale
+        case "tilt_x": .tiltX
+        case "tilt_y": .tiltY
         default: nil
         }
     }
@@ -233,11 +245,12 @@ private enum BridgeRequest: Sendable {
             return mode
         case .batteryPercent:
             return String(try unsignedInteger(value, field: key.rawValue, maximum: 100))
-        case .timeScale:
+        case .timeScale, .tiltX, .tiltY:
+            let range: ClosedRange<Double> = key == .timeScale ? 0.01...1_000 : -1...1
             guard let number = value as? NSNumber,
                   !isBoolean(number),
                   number.doubleValue.isFinite,
-                  (0.01...1_000).contains(number.doubleValue)
+                  range.contains(number.doubleValue)
             else {
                 throw NativeBridgeInputError.invalidValue(key.rawValue)
             }

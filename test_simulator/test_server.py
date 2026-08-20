@@ -22,6 +22,7 @@ class FakeBackend:
       "screen": {"mode": "NOW"},
     }
     self.actions: list[str] = []
+    self.touches: list[tuple[object, object]] = []
     self.scenarios: list[dict[str, object]] = []
     self.reset_count = 0
     self.active = 0
@@ -39,6 +40,11 @@ class FakeBackend:
 
   def perform_action(self, action: str) -> dict[str, object]:
     self.actions.append(action)
+    self.state["revision"] = int(self.state["revision"]) + 1
+    return dict(self.state)
+
+  def touch(self, x: object, y: object) -> dict[str, object]:
+    self.touches.append((x, y))
     self.state["revision"] = int(self.state["revision"]) + 1
     return dict(self.state)
 
@@ -426,6 +432,32 @@ class HTTPServerTest(unittest.TestCase):
     self.assertTrue(old_backend.closed)
     self.assertTrue(all(not backend.overlapped for backend in self.created_backends))
     self.assertEqual(self.manager.firmware_id, "99_stopwatch")
+
+
+class TouchEndpointTest(HTTPServerTest):
+  """A press has a position; the endpoint has to carry it and bound it."""
+
+  def test_a_touch_reaches_the_backend_with_its_coordinate(self) -> None:
+    status, _headers, payload = self.json_request(
+      "/api/action", {"action": "touch", "x": 233, "y": 60}
+    )
+    self.assertEqual(status, 200)
+    self.assertEqual(self.backend.touches, [(233, 60)])
+    self.assertEqual(payload["revision"], 2)
+
+  def test_a_coordinate_is_refused_for_any_other_action(self) -> None:
+    status, _headers, payload = self.json_request(
+      "/api/action", {"action": "mark", "x": 1, "y": 2}
+    )
+    self.assertEqual(status, 400)
+    self.assertEqual(payload["error"]["code"], "invalid_action_request")
+    self.assertEqual(self.backend.touches, [])
+
+  def test_a_touch_without_a_coordinate_is_refused(self) -> None:
+    status, _headers, payload = self.json_request("/api/action", {"action": "touch"})
+    self.assertEqual(status, 400)
+    self.assertEqual(payload["error"]["code"], "invalid_action_request")
+    self.assertEqual(self.backend.actions, [])
 
 
 if __name__ == "__main__":

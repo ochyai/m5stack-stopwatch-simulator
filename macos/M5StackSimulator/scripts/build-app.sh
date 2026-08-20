@@ -12,6 +12,7 @@ build_number="1"
 run_tests=1
 install_dependencies=1
 adhoc_sign=0
+developer_id=""
 output_root="${package_root}/dist"
 
 usage() {
@@ -28,6 +29,8 @@ Options:
   --skip-tests                   Do not run the Swift bridge tests
   --skip-dependency-install      Reuse workbench node_modules instead of npm ci
   --adhoc-sign                   Apply a local ad-hoc signature (never Developer ID)
+  --developer-id <identity>      Sign with a Developer ID Application identity and the
+                                 hardened runtime, ready for notarization
   -h, --help                     Show this help
 USAGE
 }
@@ -60,6 +63,11 @@ while [[ $# -gt 0 ]]; do
       ;;
     --skip-dependency-install)
       install_dependencies=0
+      shift
+      ;;
+    --developer-id)
+      [[ $# -ge 2 ]] || { echo "--developer-id needs an identity" >&2; exit 2; }
+      developer_id="$2"
       shift
       ;;
     --adhoc-sign)
@@ -203,7 +211,27 @@ plutil -lint "${staging_app}/Contents/Info.plist"
   exit 1
 }
 
-if [[ ${adhoc_sign} -eq 1 ]]; then
+if [[ -n "${developer_id}" && ${adhoc_sign} -eq 1 ]]; then
+  echo "--developer-id and --adhoc-sign are mutually exclusive" >&2
+  exit 2
+fi
+
+if [[ -n "${developer_id}" ]]; then
+  command -v codesign >/dev/null 2>&1 || {
+    echo "codesign is unavailable" >&2
+    exit 1
+  }
+  # Sign inside out: the hardened runtime refuses to launch a helper the outer
+  # signature does not already cover.
+  for binary in \
+    "${staging_app}/Contents/Resources/Native/sokkon-native" \
+    "${staging_app}/Contents/Resources/Native/stopwatch-native" \
+    "${staging_app}/Contents/MacOS/M5StackSimulator"; do
+    codesign --force --options runtime --timestamp --sign "${developer_id}" "${binary}"
+  done
+  codesign --force --options runtime --timestamp --sign "${developer_id}" "${staging_app}"
+  codesign --verify --deep --strict --verbose=2 "${staging_app}"
+elif [[ ${adhoc_sign} -eq 1 ]]; then
   command -v codesign >/dev/null 2>&1 || {
     echo "codesign is unavailable" >&2
     exit 1
@@ -224,7 +252,9 @@ rm -rf "${staging_root}"
 trap - EXIT
 
 echo "Built ${app_path}"
-if [[ ${adhoc_sign} -eq 0 ]]; then
+if [[ -n "${developer_id}" ]]; then
+  echo "Signature: Developer ID with hardened runtime; notarize the DMG next"
+elif [[ ${adhoc_sign} -eq 0 ]]; then
   echo "Signature: unsigned (use --adhoc-sign for local launch testing)"
 else
   echo "Signature: ad-hoc only (not suitable for external distribution)"

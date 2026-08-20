@@ -29,6 +29,8 @@ M5Stack StopWatch（C152）のハードウェアを、安全かつ再現可能�
 - 描画命令(`frame.commands`)の解釈は`simulator/static/frame-renderer.js`だけが行う。従来UI(`simulator/static/app.js`)とWorkbench(`simulator/workbench/src/App.jsx`)はこれをimportする。UI側に2つ目のcanvas解釈を書かない。font familyのような純粋な見た目の差はtypography optionで渡す。
 - 文字の寸法は推定しない。`simulator/native/include/font_metrics.hpp`は実機が使うM5GFXから計測した生成物で、手で編集しない。フォントを増減したら`make font-metrics`で再生成する。`textWidth`と`drawString`の幾何は`sim_text.hpp`（LovyanGFXの`text_width`/`draw_string`の移植）だけが持つ。
 - 文字位置はnative runnerが`layout`として発行する。UIはそのpen gridに従って1文字ずつ描く。ブラウザのフォント計測でレイアウトを決め直さない。
+- タッチは座標を持つ。UIの画面クリックはデバイス座標(0..465)を`TOUCH x y`として本番`loop()`へ渡す。中心固定のタップに戻さない。IMUの傾きはシナリオの`tilt_x`/`tilt_y`で与える。
+- 入力経路を増やしたら、HTTP(`simulator/server.py`)、セッション(`simulator/session.py`)、Swift bridge(`macos/.../NativeBridgeHandler.swift`)の3つを揃える。どれか1つだけ対応すると、配布した.appだけ挙動が違う状態になる。
 - 画面の変更を伴う作業は、`scenarios/*.sim`のセッションで確認し、意図した変更なら`make golden-update`でゴールデンを更新して差分をレビューする。ゴールデンを無検査で上書きしない。
 - ビルド生成物、`.pio/`、工場 Flash バックアップ、秘密情報をコミットしない。
 - ファイル編集は既存のユーザー変更を保持し、依頼範囲外の整形・置換をしない。
@@ -106,4 +108,4 @@ make monitor ENV=00_smoke PORT=/dev/cu.usbmodemXXXX
 
 ## ライセンス
 
-このリポジトリは現時点でライセンス未設定。ライセンスが決まるまで、外部コードを安易にコピーせず、必要なら出典・ライセンス互換性を確認する。
+このリポジトリは MIT License（`LICENSE`）。外部コードを取り込むときは互換性を確認し、出典を `NOTICE.md` に追記する。生成物に外部由来のデータを含める場合は、何を複製し何を複製していないかを明記する（例: フォントは計測値のみで、グリフビットマップは複製しない）。

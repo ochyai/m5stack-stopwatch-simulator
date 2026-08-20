@@ -69,7 +69,9 @@ ADVANCE_COMMANDS = {
   "advance_2m": 120_001,
   "advance_10m": 600_001,
 }
-SUPPORTED_ACTIONS = frozenset((*ACTION_COMMANDS, *ADVANCE_COMMANDS, "reset"))
+# ``touch`` is an action a caller can name, but it carries a coordinate and so
+# travels through ``touch()`` rather than the named-action path.
+SUPPORTED_ACTIONS = frozenset((*ACTION_COMMANDS, *ADVANCE_COMMANDS, "reset", "touch"))
 # Scripted sessions may step virtual time freely inside one day; a runner still
 # enforces its own firmware-specific ceiling.
 MAX_ADVANCE_MS = 24 * 60 * 60 * 1000
@@ -83,7 +85,12 @@ CONFIGURATION_KEYS = (
   "battery_percent",
   "charging",
   "time_scale",
+  "tilt_x",
+  "tilt_y",
 )
+TILT_KEYS = ("tilt_x", "tilt_y")
+# The panel is 466 x 466; a touch is addressed in its pixels.
+DISPLAY_SIZE = 466
 MODE_ORDER = ("NOW", "BUILD", "READ", "MEET", "PRESENT", "REST")
 
 
@@ -188,6 +195,13 @@ def normalize_configuration(mapping: object) -> dict[str, str]:
       if type(value) is not int or not 0 <= value <= 100:
         raise BackendInputError("battery_percent must be an integer from 0 to 100")
       encoded[key] = str(value)
+    elif key in TILT_KEYS:
+      if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise BackendInputError(f"{key} must be a number")
+      numeric = float(value)
+      if not math.isfinite(numeric) or not -1.0 <= numeric <= 1.0:
+        raise BackendInputError(f"{key} must be between -1 and 1 g")
+      encoded[key] = format(numeric, ".15g")
     elif key == "time_scale":
       if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise BackendInputError("time_scale must be a finite number")
@@ -430,6 +444,8 @@ class NativeSimulatorBackend:
 
   def perform_action(self, action: object) -> dict[str, Any]:
     normalized = normalize_action(action)
+    if normalized == "touch":
+      raise BackendInputError("a touch needs a coordinate; call touch(x, y)")
     if normalized == "reset":
       return self.reset()
     if normalized in ADVANCE_COMMANDS:
@@ -438,6 +454,21 @@ class NativeSimulatorBackend:
       command = f"ACTION\t{ACTION_COMMANDS[normalized]}"
     with self._lock:
       return self._exchange_locked(command)
+
+  def touch(self, x: object, y: object) -> dict[str, Any]:
+    """Press and release at one panel coordinate.
+
+    Firmware reads position, not just contact: 10_sokkon only treats a press
+    inside its focus ring as a toggle. A centre-only simulator could not show
+    that, so the coordinate travels all the way to the production loop.
+    """
+    for name, value in (("x", x), ("y", y)):
+      if type(value) is not int or not 0 <= value < DISPLAY_SIZE:
+        raise BackendInputError(
+          f"touch {name} must be an integer from 0 to {DISPLAY_SIZE - 1}"
+        )
+    with self._lock:
+      return self._exchange_locked(f"TOUCH\t{x}\t{y}")
 
   def advance(self, milliseconds: object) -> dict[str, Any]:
     """Advance virtual time by an exact number of milliseconds.
@@ -738,6 +769,10 @@ class NativeSimulatorBackendManager:
   def freeze_time(self, frozen: object) -> dict[str, Any]:
     with self._lock:
       return self._backend_locked().freeze_time(frozen)
+
+  def touch(self, x: object, y: object) -> dict[str, Any]:
+    with self._lock:
+      return self._backend_locked().touch(x, y)
 
   def configure(self, mapping: object) -> dict[str, Any]:
     with self._lock:

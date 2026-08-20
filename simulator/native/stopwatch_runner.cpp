@@ -46,6 +46,7 @@ class StopwatchHost final : public sim_host::Host {
     auto& state = sokkon_sim::runtime();
     state.battery_percent = scenario.battery_percent;
     state.charging = scenario.charging;
+    sim_host::applyTilt(scenario.tilt_x, scenario.tilt_y);
     setup();
     processDeviceOutput();
     advanceRuntimeByMs(40);
@@ -67,13 +68,8 @@ class StopwatchHost final : public sim_host::Host {
       runFirmwareLoop();
       log.add("INPUT", "B / RESET");
     } else if (action == "FOCUS") {
-      state.touch_x = M5.Display.width() / 2;
-      state.touch_y = M5.Display.height() / 2;
-      state.touch_pressed = true;
-      runFirmwareLoop();
-      state.touch_pressed = false;
-      runFirmwareLoop();
-      log.add("INPUT", "TOUCH / START-PAUSE");
+      performTouch(M5.Display.width() / 2, M5.Display.height() / 2);
+      return;
     } else if (action == "WAKE") {
       // This firmware has no sleep state. A wake request must not masquerade as
       // a touch and unexpectedly toggle a running stopwatch.
@@ -83,10 +79,19 @@ class StopwatchHost final : public sim_host::Host {
       command_error = "unsupported action";
       return;
     }
-    // The production app redraws at 30 fps. Run its actual loop across one
-    // frame boundary instead of manufacturing a browser-side state update.
-    advanceRuntimeByMs(40);
+    settleInput();
   }
+
+  void performTouch(int32_t x, int32_t y) override {
+    sim_host::Host::performTouch(x, y);
+    log.add("INPUT", "TOUCH / START-PAUSE");
+  }
+
+  void runOneLoop() override { runFirmwareLoop(); }
+
+  // The production app redraws at 30 fps. Run its actual loop across one frame
+  // boundary instead of manufacturing a browser-side state update.
+  void settleInput() override { advanceRuntimeByMs(40); }
 
   void advance(uint64_t milliseconds) override { advanceRuntimeByMs(milliseconds); }
 
@@ -111,6 +116,10 @@ class StopwatchHost final : public sim_host::Host {
       battery_percent = scenario.battery_percent;
       charging = scenario.charging;
       drawUi(stopwatch.elapsedUs(nowMicros()));
+    } else if (key == "TILT_X" || key == "TILT_Y") {
+      // The tilt readout reaches the screen on the firmware's own 500 ms
+      // sensor tick, not the moment the accelerometer changes.
+      advanceRuntimeByMs(520);
     }
   }
 

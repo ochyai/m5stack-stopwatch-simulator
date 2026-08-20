@@ -236,6 +236,17 @@
               <span class="switch" aria-hidden="true"></span>
             </label>
 
+            <div class="field-group">
+              <label for="tilt-x-input">
+                <span>Tilt X <output id="tilt-x-output" for="tilt-x-input">0.12 g</output></span>
+                <input id="tilt-x-input" type="range" min="-1" max="1" step="0.01" value="0.12" data-scenario="tilt_x" data-testid="tilt-x-input">
+              </label>
+              <label for="tilt-y-input">
+                <span>Tilt Y <output id="tilt-y-output" for="tilt-y-input">-0.08 g</output></span>
+                <input id="tilt-y-input" type="range" min="-1" max="1" step="0.01" value="-0.08" data-scenario="tilt_y" data-testid="tilt-y-input">
+              </label>
+            </div>
+
             <div class="field-group" data-host-control>
               <label for="context-input">Frontmost app / context</label>
               <input id="context-input" type="text" maxlength="39" value="CODEX" placeholder="CODEX" data-scenario="context" data-testid="context-input">

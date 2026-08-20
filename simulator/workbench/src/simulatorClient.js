@@ -10,7 +10,11 @@ const CONFIGURATION_KEYS = new Set([
   "battery_percent",
   "charging",
   "time_scale",
+  "tilt_x",
+  "tilt_y",
 ]);
+
+const DEVICE_SIZE = 466;
 
 const HTTP_ADVANCE_ACTIONS = new Map([
   [6001, "advance_6s"],
@@ -55,6 +59,14 @@ function assertAction(action) {
   if (!ACTIONS.has(action)) throw new Error(`Unsupported action: ${action}`);
 }
 
+function assertPanelPoint(x, y) {
+  for (const value of [x, y]) {
+    if (!Number.isInteger(value) || value < 0 || value >= DEVICE_SIZE) {
+      throw new Error(`Touch must land inside 0..${DEVICE_SIZE - 1}`);
+    }
+  }
+}
+
 function assertConfiguration(configuration) {
   if (!configuration || typeof configuration !== "object" || Array.isArray(configuration)) {
     throw new Error("Configuration must be an object");
@@ -96,6 +108,17 @@ export const simulatorClient = {
           method: "POST",
           body: JSON.stringify({ firmware }),
           timeout: 120000,
+        });
+  },
+
+  async touch(x, y) {
+    assertPanelPoint(x, y);
+    const bridge = nativeBridge();
+    return bridge
+      ? bridge.touch(x, y)
+      : request("/api/action", {
+          method: "POST",
+          body: JSON.stringify({ action: "touch", x, y }),
         });
   },
 

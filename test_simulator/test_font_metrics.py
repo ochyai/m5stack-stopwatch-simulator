@@ -155,5 +155,42 @@ class DeviceFontMetricsTest(unittest.TestCase):
     self.assertLess(drawn["layout"]["width"], CONTEXT_MAX_WIDTH)
 
 
+class PanelInputTest(unittest.TestCase):
+  """A press has a position, and the firmware reads it."""
+
+  @classmethod
+  def setUpClass(cls) -> None:
+    result = subprocess.run(
+      [str(BUILD_SCRIPT)],
+      cwd=ROOT,
+      text=True,
+      stdout=subprocess.PIPE,
+      stderr=subprocess.STDOUT,
+      timeout=120,
+      check=False,
+    )
+    if result.returncode != 0:
+      raise AssertionError(f"native build failed:\n{result.stdout}")
+
+  def test_only_a_press_inside_the_focus_ring_starts_the_timer(self) -> None:
+    with NativeRunner() as runner:
+      start = runner.command("SNAPSHOT")
+      # 173 px above the centre: inside the panel, outside the 145 px ring.
+      outside = runner.command("TOUCH\t233\t60")
+      inside = runner.command("TOUCH\t233\t233")
+
+    self.assertFalse(start["screen"]["focus_running"])
+    self.assertFalse(outside["screen"]["focus_running"], "a press outside the ring must not toggle")
+    self.assertTrue(inside["screen"]["focus_running"])
+
+  def test_a_touch_outside_the_panel_is_refused(self) -> None:
+    with NativeRunner() as runner:
+      for command in ("TOUCH\t466\t0", "TOUCH\t0\t999", "TOUCH\t233", "TOUCH\tx\ty"):
+        snapshot = runner.command(command)
+        self.assertTrue(snapshot.get("command_error"), f"{command} should be refused")
+      # The process stays usable after refusing bad input.
+      self.assertIn("screen", runner.command("SNAPSHOT"))
+
+
 if __name__ == "__main__":
   unittest.main()
