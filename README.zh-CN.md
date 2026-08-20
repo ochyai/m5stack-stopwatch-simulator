@@ -10,6 +10,7 @@
 [![CI](https://github.com/ochyai/m5stack-stopwatch-simulator/actions/workflows/ci.yml/badge.svg)](https://github.com/ochyai/m5stack-stopwatch-simulator/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-informational.svg)](LICENSE)
 [![Platform: macOS](https://img.shields.io/badge/Platform-macOS-lightgrey.svg)](macos/M5StackSimulator/README.md)
+[![Download](https://img.shields.io/github/v/release/ochyai/m5stack-stopwatch-simulator?label=Download%20for%20macOS&color=success)](https://github.com/ochyai/m5stack-stopwatch-simulator/releases/latest)
 
 <img src="docs/images/workbench.png" alt="Firmware Workbench：左侧是固件列表与构建，中间是真机画面，右侧是输入与传感器 Inspector，下方是事件时间线" width="900">
 
@@ -30,7 +31,7 @@
 
 ## 30 秒跑起来
 
-不需要真机，只需要 Python 3 和一个 C++ 编译器。
+不需要真机。已签名并公证的 `.app` 见 [Releases](https://github.com/ochyai/m5stack-stopwatch-simulator/releases/latest)，下载后双击即可打开（仅 Apple Silicon）。若从源码运行，也只需要 Python 3 和一个 C++ 编译器。
 
 ```bash
 # 编译量产 C++，在 localhost 启动并打开浏览器

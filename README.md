@@ -10,6 +10,7 @@
 [![CI](https://github.com/ochyai/m5stack-stopwatch-simulator/actions/workflows/ci.yml/badge.svg)](https://github.com/ochyai/m5stack-stopwatch-simulator/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-informational.svg)](LICENSE)
 [![Platform: macOS](https://img.shields.io/badge/Platform-macOS-lightgrey.svg)](macos/M5StackSimulator/README.md)
+[![Download](https://img.shields.io/github/v/release/ochyai/m5stack-stopwatch-simulator?label=Download%20for%20macOS&color=success)](https://github.com/ochyai/m5stack-stopwatch-simulator/releases/latest)
 
 <img src="docs/images/workbench.png" alt="Firmware Workbench: 左にファームウェア一覧とビルド、中央に実機の画面、右に入力とセンサーのInspector、下にイベントTimeline" width="900">
 
@@ -30,7 +31,7 @@ M5Stack StopWatch（C152）を、Mac から再現可能な形で調査・開発�
 
 ## 30 秒で動かす
 
-実機は不要です。必要なのは Python 3 と C++ コンパイラだけです。
+実機は不要です。署名・公証済みの `.app` は [Releases](https://github.com/ochyai/m5stack-stopwatch-simulator/releases/latest) にあり、ダウンロードしてダブルクリックで開きます（Apple Silicon 専用）。ソースから動かす場合も、必要なのは Python 3 と C++ コンパイラだけです。
 
 ```bash
 # 本番C++をコンパイルし、localhostで起動してブラウザを開く

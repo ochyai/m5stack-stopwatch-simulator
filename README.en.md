@@ -10,6 +10,7 @@ Text is measured with the device's real font metrics, so you can settle screen q
 [![CI](https://github.com/ochyai/m5stack-stopwatch-simulator/actions/workflows/ci.yml/badge.svg)](https://github.com/ochyai/m5stack-stopwatch-simulator/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-informational.svg)](LICENSE)
 [![Platform: macOS](https://img.shields.io/badge/Platform-macOS-lightgrey.svg)](macos/M5StackSimulator/README.md)
+[![Download](https://img.shields.io/github/v/release/ochyai/m5stack-stopwatch-simulator?label=Download%20for%20macOS&color=success)](https://github.com/ochyai/m5stack-stopwatch-simulator/releases/latest)
 
 <img src="docs/images/workbench.png" alt="Firmware Workbench: firmware list and build on the left, the live device in the centre, an input and sensor Inspector on the right, an event timeline below" width="900">
 
@@ -30,7 +31,7 @@ A repository for exploring and developing the M5Stack StopWatch (C152) reproduci
 
 ## Run it in 30 seconds
 
-No hardware required. You need Python 3 and a C++ compiler.
+No hardware required. A signed and notarized `.app` is on the [Releases page](https://github.com/ochyai/m5stack-stopwatch-simulator/releases/latest) — download it and double-click (Apple Silicon only). Running from source needs only Python 3 and a C++ compiler.
 
 ```bash
 # Compile the production C++, serve it on localhost, open a browser
