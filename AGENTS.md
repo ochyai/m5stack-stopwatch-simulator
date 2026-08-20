@@ -101,6 +101,8 @@ make monitor ENV=00_smoke PORT=/dev/cu.usbmodemXXXX
 
 ## 文書化
 
+- READMEは日本語(`README.md`)、英語(`README.en.md`)、中国語(`README.zh-CN.md`)の3本を同じ構成で保つ。片方だけ更新しない。見出し・画像・表の数が揃っていることを確認する。
+- READMEの画像は`docs/images/`に置き、実際のシミュレータから生成する。手描きのモックを混ぜない。
 - 実機でだけ確認した事項は「実機確認」と明記し、公式製品仕様と区別する。
 - ピン、電圧、Flash サイズ、書き込み手順を変更するときは一次資料を示す。
 - 新しい環境を追加したら README の環境一覧と `docs/DEVELOPMENT.md` を更新する。
