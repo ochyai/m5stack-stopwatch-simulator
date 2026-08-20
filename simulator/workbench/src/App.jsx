@@ -237,6 +237,7 @@ export function App() {
   const [pendingControl, setPendingControl] = useState("");
   const [batteryDraft, setBatteryDraft] = useState(84);
   const [timeScaleDraft, setTimeScaleDraft] = useState(1);
+  const [tiltDraft, setTiltDraft] = useState({ x: 0.12, y: -0.08 });
 
   const observeNativeLog = useCallback((next) => {
     const firmwareID = safeText(next?.firmware?.id);
@@ -333,6 +334,12 @@ export function App() {
   useEffect(() => {
     if (document.activeElement?.id !== "battery-range") {
       setBatteryDraft(clamp(snapshot.scenario?.battery_percent ?? snapshot.screen?.battery_percent ?? 84, 0, 100));
+    }
+    if (!String(document.activeElement?.id ?? "").startsWith("tilt-")) {
+      setTiltDraft({
+        x: clamp(snapshot.scenario?.tilt_x ?? 0.12, -1, 1),
+        y: clamp(snapshot.scenario?.tilt_y ?? -0.08, -1, 1),
+      });
     }
     if (document.activeElement?.id !== "time-scale-range") {
       setTimeScaleDraft(clamp(snapshot.scenario?.time_scale ?? 1, 0.01, 1000));
@@ -499,9 +506,10 @@ export function App() {
   const battery = clamp(batteryDraft, 0, 100);
   const charging = Boolean(scenario.charging ?? screen.charging);
   const virtualTimeEnabled = timeScaleDraft > 0.01;
-  const imuText = snapshot.frame?.commands?.find((command) => commandName(command) === "drawstring" && safeText(command.text).startsWith("IMU tilt"))?.text ?? "IMU tilt  X+0.12  Y-0.08";
-  const imuMatch = imuText.match(/X([+-]?\d+(?:\.\d+)?)\s+Y([+-]?\d+(?:\.\d+)?)/i);
-  const imu = { x: imuMatch?.[1] ?? "+0.12", y: imuMatch?.[2] ?? "-0.08", z: "+0.98" };
+  const tiltX = clamp(tiltDraft.x, -1, 1);
+  const tiltY = clamp(tiltDraft.y, -1, 1);
+  // Gravity keeps its magnitude, so the z axis reads whatever x and y leave.
+  const tiltZ = Math.sqrt(Math.max(0, 1 - tiltX * tiltX - tiltY * tiltY));
 
   const nativeEvents = useMemo(() => {
     const fullLog = Array.isArray(snapshot.log) ? snapshot.log : [];
@@ -722,12 +730,41 @@ export function App() {
                   <SectionHeading>Sensors</SectionHeading>
                   <div className="sensor-row">
                     <label><Crosshair size={18} aria-hidden="true" /> IMU Tilt</label>
-                    <div className="axis-readout"><span>X <b>{imu.x}</b></span><span>Y <b>{imu.y}</b></span><span>Z <b>{imu.z}</b></span></div>
+                    <div className="axis-readout">
+                      <span>X <b>{tiltX.toFixed(2)}</b></span>
+                      <span>Y <b>{tiltY.toFixed(2)}</b></span>
+                      <span>Z <b>{tiltZ.toFixed(2)}</b></span>
+                    </div>
                   </div>
-                  <div className="inline-control sensor-noise">
-                    <label><Gauge size={18} aria-hidden="true" /> IMU Noise</label>
-                    <input type="range" min="0" max="1" step="0.01" value="0.02" disabled readOnly />
-                    <output>0.02</output>
+                  <div className="inline-control">
+                    <label htmlFor="tilt-x-range"><Gauge size={18} aria-hidden="true" /> Tilt X</label>
+                    <input
+                      id="tilt-x-range"
+                      type="range"
+                      min="-1"
+                      max="1"
+                      step="0.01"
+                      value={tiltDraft.x}
+                      onChange={(event) => setTiltDraft((current) => ({ ...current, x: Number(event.target.value) }))}
+                      onPointerUp={(event) => configure({ tilt_x: Number(event.currentTarget.value) }, "Tilt changed")}
+                      onKeyUp={(event) => event.key.startsWith("Arrow") && configure({ tilt_x: Number(event.currentTarget.value) }, "Tilt changed")}
+                    />
+                    <output>{tiltX.toFixed(2)} g</output>
+                  </div>
+                  <div className="inline-control">
+                    <label htmlFor="tilt-y-range"><Gauge size={18} aria-hidden="true" /> Tilt Y</label>
+                    <input
+                      id="tilt-y-range"
+                      type="range"
+                      min="-1"
+                      max="1"
+                      step="0.01"
+                      value={tiltDraft.y}
+                      onChange={(event) => setTiltDraft((current) => ({ ...current, y: Number(event.target.value) }))}
+                      onPointerUp={(event) => configure({ tilt_y: Number(event.currentTarget.value) }, "Tilt changed")}
+                      onKeyUp={(event) => event.key.startsWith("Arrow") && configure({ tilt_y: Number(event.currentTarget.value) }, "Tilt changed")}
+                    />
+                    <output>{tiltY.toFixed(2)} g</output>
                   </div>
                 </section>
 
