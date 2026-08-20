@@ -109,7 +109,13 @@ esac
 
 mkdir -p "${output_root}"
 output_root="$(cd "${output_root}" && pwd)"
-base_name="M5Stack-Simulator-${version}-${architecture_label}-local"
+# "-local" marks an image that only this Mac can open. A Developer ID signed
+# image is meant to travel, so it does not carry that warning in its name.
+if [[ -n "${developer_id}" ]]; then
+  base_name="M5Stack-Simulator-${version}-${architecture_label}"
+else
+  base_name="M5Stack-Simulator-${version}-${architecture_label}-local"
+fi
 dmg_path="${output_root}/${base_name}.dmg"
 checksum_path="${dmg_path}.sha256"
 staging_root="$(mktemp -d "${output_root}/.M5StackSimulatorDMG.XXXXXX")"
